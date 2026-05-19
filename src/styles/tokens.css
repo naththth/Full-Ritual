@@ -1,0 +1,108 @@
+/* =====================================================================
+   FULL RITUAL · DESIGN TOKENS
+   Toda a linguagem visual em variáveis CSS. Não duplicar valores.
+   ===================================================================== */
+
+:root {
+  /* ---------- COR · base e texto ---------- */
+  --ivory:           #F5EEDF;
+  --ivory-2:         #EDE4D1;
+  --paper:           #FBF6EB;
+  --camel:           #C8B58C;
+  --chocolate:       #4A2C22;
+  --chocolate-soft:  #6B4A3E;
+
+  /* ---------- COR · dimensões (semântico, nunca decorativo) ---------- */
+  --skin:    #D89A82;  /* Pele     · Warm Blush     · ink chocolate */
+  --body:    #B85A1F;  /* Corpo    · Burnt Orange   · ink ivory */
+  --mind:    #1F4751;  /* Mente    · Deep Teal      · ink ivory */
+  --diet:    #54683E;  /* Dieta    · Olive Green    · ink ivory */
+  --spirit:  #4A2A3F;  /* Espírito · Aubergine      · ink ivory */
+
+  /* Ink por dimensão (uso direto para evitar overrides) */
+  --ink-on-skin:    var(--chocolate);
+  --ink-on-body:    var(--ivory);
+  --ink-on-mind:    var(--ivory);
+  --ink-on-diet:    var(--ivory);
+  --ink-on-spirit:  var(--ivory);
+
+  /* ---------- COR · acentos auxiliares (usar com parcimônia) ---------- */
+  --terracota:  #9C4A2D;
+  --mustard:    #C48A2A;
+  --sage:       #8D9D89;
+  --rosewood:   #6B342E;  /* care alert · nunca erro técnico */
+
+  /* ---------- LINHAS E SOMBRAS ---------- */
+  --line:         rgba(74, 44, 34, 0.10);
+  --line-strong:  rgba(74, 44, 34, 0.18);
+  --shadow:       0 18px 40px rgba(74, 44, 34, 0.10);
+  --shadow-s:     0 6px 18px rgba(74, 44, 34, 0.06);
+
+  /* ---------- TIPOGRAFIA ---------- */
+  --display: 'Instrument Serif', 'Cormorant Garamond', serif;
+  --sans:    'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mono:    'IBM Plex Mono', 'SF Mono', monospace;
+
+  /* Escala — 8 tamanhos, nada mais */
+  --fs-display-xl: 56px;
+  --fs-display-lg: 40px;
+  --fs-display-md: 28px;
+  --fs-body-lg:    17px;
+  --fs-body:       14px;
+  --fs-body-sm:    12px;
+  --fs-mono-num:   32px;
+  --fs-mono-label: 10px;
+
+  /* ---------- RAIOS ---------- */
+  --radius-card:  22px;
+  --radius-block: 18px;
+  --radius-pill:  999px;
+
+  /* ---------- ESPAÇAMENTOS (escala 4px) ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 56px;
+
+  /* ---------- MOVIMENTO · respira, não acelera ---------- */
+  --t-fast:   180ms;
+  --t-base:   320ms;
+  --t-slow:   640ms;
+  --t-breath: 4000ms;
+
+  --e-out:   cubic-bezier(0.16, 0.84, 0.4, 1);
+  --e-in:    cubic-bezier(0.6, 0, 0.84, 0.16);
+  --e-soft:  cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- LAYOUT MOBILE ---------- */
+  --nav-h:        78px;
+  --safe-bottom:  env(safe-area-inset-bottom, 0px);
+  --safe-top:     env(safe-area-inset-top, 0px);
+}
+
+/* =====================================================================
+   UTILITÁRIOS TIPOGRÁFICOS (não usar fora dos componentes principais)
+   ===================================================================== */
+.t-display-xl { font-family: var(--display); font-size: var(--fs-display-xl); line-height: 0.95; letter-spacing: -0.025em; font-weight: 400; }
+.t-display-lg { font-family: var(--display); font-size: var(--fs-display-lg); line-height: 1.0;  letter-spacing: -0.022em; font-weight: 400; }
+.t-display-md { font-family: var(--display); font-size: var(--fs-display-md); line-height: 1.05; letter-spacing: -0.02em;  font-weight: 400; }
+.t-display-italic { font-family: var(--display); font-style: italic; font-weight: 400; }
+
+.t-body-lg { font-family: var(--sans); font-size: var(--fs-body-lg); line-height: 1.5;  font-weight: 400; }
+.t-body    { font-family: var(--sans); font-size: var(--fs-body);    line-height: 1.45; font-weight: 400; }
+.t-body-sm { font-family: var(--sans); font-size: var(--fs-body-sm); line-height: 1.45; font-weight: 400; }
+
+.t-mono-num   { font-family: var(--mono); font-size: var(--fs-mono-num); line-height: 1; font-weight: 400; }
+.t-mono-label {
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(74, 44, 34, 0.55);
+}

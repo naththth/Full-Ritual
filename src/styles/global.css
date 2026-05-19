@@ -1,0 +1,261 @@
+@import './tokens.css';
+
+/* =====================================================================
+   RESET MÍNIMO
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  color: var(--chocolate);
+  background: var(--ivory);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select { font-family: inherit; color: inherit; font-size: inherit; }
+button { cursor: pointer; border: 0; background: transparent; }
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+
+/* =====================================================================
+   APP SHELL (mobile-first; desktop é uma "moldura de telefone")
+   ===================================================================== */
+.app-shell {
+  min-height: 100dvh;
+  background: var(--ivory);
+  display: flex;
+  justify-content: center;
+}
+
+.app {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  position: relative;
+  background: var(--ivory);
+  overflow: hidden;
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    background:
+      radial-gradient(circle at 12% 0%, rgba(216, 154, 130, 0.18), transparent 30%),
+      radial-gradient(circle at 90% 8%, rgba(31, 71, 81, 0.10), transparent 34%),
+      var(--ivory-2);
+    padding: 24px 0;
+  }
+  .app {
+    min-height: calc(100dvh - 48px);
+    border-radius: 34px;
+    box-shadow: 0 20px 60px rgba(74, 44, 34, 0.12);
+  }
+}
+
+.scroll {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+  scroll-behavior: smooth;
+}
+.scroll::-webkit-scrollbar { display: none; }
+
+/* =====================================================================
+   BOTÕES (pill chocolate; pesos primary, secondary, ghost, dimension)
+   ===================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: var(--radius-pill);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: transform var(--t-fast) var(--e-soft), background var(--t-fast) var(--e-soft);
+}
+.btn:active { transform: scale(0.98); }
+
+.btn--primary   { background: var(--chocolate); color: var(--ivory); }
+.btn--secondary { background: transparent; color: var(--chocolate); border: 1px solid var(--line-strong); }
+.btn--ghost     { background: transparent; color: var(--chocolate); }
+
+.btn--full { width: 100%; }
+.btn--sm   { min-height: 38px; padding: 8px 14px; font-size: var(--fs-body-sm); }
+
+/* Pill de dimensão (usa --dim como var dinâmica) */
+.btn--dimension { background: var(--dim, var(--chocolate)); color: var(--ivory); }
+
+/* =====================================================================
+   CARDS (radius 22, sombra warm, borda hairline)
+   ===================================================================== */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 18px;
+  box-shadow: var(--shadow-s);
+  position: relative;
+  overflow: hidden;
+}
+
+.card--dim {
+  background: var(--dim);
+  color: var(--ink-on-dim, var(--ivory));
+  border: none;
+}
+
+.card--ai {
+  background: var(--spirit);
+  color: var(--ivory);
+  border: none;
+}
+
+/* =====================================================================
+   EYEBROW (mono label) e títulos
+   ===================================================================== */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(74, 44, 34, 0.55);
+}
+
+.card--dim .eyebrow, .card--ai .eyebrow { color: rgba(245, 238, 223, 0.72); }
+
+/* =====================================================================
+   INPUT FIELDS
+   ===================================================================== */
+.field {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--ivory);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-block);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  outline: none;
+  transition: border-color var(--t-fast) var(--e-soft), box-shadow var(--t-fast) var(--e-soft);
+}
+.field:focus {
+  border-color: var(--chocolate);
+  box-shadow: 0 0 0 4px rgba(74, 44, 34, 0.08);
+}
+
+/* =====================================================================
+   CHIP (tag pill)
+   ===================================================================== */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: var(--fs-body-sm);
+  font-weight: 500;
+  color: var(--chocolate);
+  transition: background var(--t-fast) var(--e-soft);
+}
+.chip--active { background: var(--chocolate); color: var(--ivory); border-color: var(--chocolate); }
+
+/* =====================================================================
+   TAB BAR (3 tabs, FAB central)
+   ===================================================================== */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  height: var(--nav-h);
+  padding: 6px 14px calc(14px + var(--safe-bottom));
+  background: rgba(245, 238, 223, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 30;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.45;
+  transition: opacity var(--t-fast) var(--e-soft);
+}
+.tab--active { opacity: 1; }
+.tab__icon { font-size: 18px; color: var(--chocolate); }
+.tab__label {
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--chocolate);
+}
+.tab--primary .tab__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  margin-top: -18px;
+  background: var(--chocolate);
+  color: var(--ivory);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  box-shadow: 0 8px 22px rgba(74, 44, 34, 0.22);
+}
+
+/* =====================================================================
+   ANEL ORGÂNICO (única forma de progresso)
+   ===================================================================== */
+.ring-track  { stroke: rgba(74, 44, 34, 0.08); fill: none; }
+.ring-value  { fill: none; stroke-linecap: round; transition: stroke-dasharray var(--t-slow) var(--e-out); }
+
+/* =====================================================================
+   PRESENÇA (loop de respiração para elementos de cuidado)
+   ===================================================================== */
+@keyframes breath {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.03); }
+}
+.breath { animation: breath var(--t-breath) ease-in-out infinite; }
+
+/* =====================================================================
+   ANIMAÇÃO DE ENTRADA DE TELA
+   ===================================================================== */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.screen { animation: fade-in-up var(--t-base) var(--e-out); padding: 20px 22px 0; }
+
+/* =====================================================================
+   UTILS (mínimo)
+   ===================================================================== */
+.stack > * + * { margin-top: var(--s-3); }
+.stack-md > * + * { margin-top: var(--s-5); }
+.stack-lg > * + * { margin-top: var(--s-7); }
+
+.row { display: flex; align-items: center; gap: var(--s-3); }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+
+.muted { color: rgba(74, 44, 34, 0.62); }
+.divider { height: 1px; background: var(--line); margin: var(--s-5) 0; }
