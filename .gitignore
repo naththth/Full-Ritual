@@ -1,6 +1,5 @@
 # dependencies
 node_modules
-<<<<<<< HEAD
 .pnpm-store
 
 # build
@@ -34,7 +33,3 @@ pnpm-debug.log*
 # supabase
 supabase/.branches
 supabase/.temp
-=======
-
-.env.local
->>>>>>> ee8d3bea1cd3ddb84ec746f3d5b7955e9840fd19
