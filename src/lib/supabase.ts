@@ -5,6 +5,10 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | und
 
 function getSupabaseOrigin(rawUrl: string | undefined) {
   if (!rawUrl) return undefined;
+  if (rawUrl.includes('xxxxxxxx') || rawUrl.includes('<project-ref>')) {
+    console.warn('[Full Ritual] VITE_SUPABASE_URL ainda está com placeholder.');
+    return undefined;
+  }
 
   try {
     const url = new URL(rawUrl);
@@ -22,8 +26,13 @@ function getSupabaseOrigin(rawUrl: string | undefined) {
 }
 
 const SUPABASE_ORIGIN = getSupabaseOrigin(SUPABASE_URL);
+const SUPABASE_KEY = isValidAnonKey(SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : undefined;
 
-if (!SUPABASE_ORIGIN || !SUPABASE_ANON_KEY) {
+function isValidAnonKey(key: string | undefined) {
+  return Boolean(key && key.length > 80 && !key.includes('...') && key !== 'placeholder');
+}
+
+if (!SUPABASE_ORIGIN || !SUPABASE_KEY) {
   // Falha visível em dev; em produção isso vira erro no console e o app degrada
   // para modo offline (localStorage) caso a integração não esteja configurada.
   console.warn(
@@ -34,7 +43,7 @@ if (!SUPABASE_ORIGIN || !SUPABASE_ANON_KEY) {
 
 export const supabase: SupabaseClient = createClient(
   SUPABASE_ORIGIN ?? 'https://placeholder.supabase.co',
-  SUPABASE_ANON_KEY ?? 'placeholder',
+  SUPABASE_KEY ?? 'placeholder',
   {
     auth: {
       autoRefreshToken: true,
@@ -44,4 +53,4 @@ export const supabase: SupabaseClient = createClient(
   }
 );
 
-export const hasSupabase = Boolean(SUPABASE_ORIGIN && SUPABASE_ANON_KEY);
+export const hasSupabase = Boolean(SUPABASE_ORIGIN && SUPABASE_KEY);

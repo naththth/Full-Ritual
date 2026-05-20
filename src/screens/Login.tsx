@@ -84,7 +84,7 @@ export function Login() {
       <h1
         style={{
           fontFamily: 'var(--display)',
-          fontSize: 56, lineHeight: 0.95, letterSpacing: '-0.025em',
+          fontSize: 56, lineHeight: 0.95, letterSpacing: 0,
           margin: '0 0 12px',
         }}
       >

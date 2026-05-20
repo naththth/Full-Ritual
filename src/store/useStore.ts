@@ -1,8 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Profile, DimensionKey } from '../types';
+import { isoToday } from '../lib/dates';
 
-type Screen = 'home' | 'ritual' | 'insight' | 'dimension' | 'profile' | 'products' | 'sleep' | 'evolution';
+type Screen =
+  | 'home'
+  | 'ritual'
+  | 'mind'
+  | 'diet'
+  | 'spirit'
+  | 'insight'
+  | 'dimension'
+  | 'profile'
+  | 'products'
+  | 'sleep'
+  | 'evolution'
+  | 'chat';
 
 interface AppState {
   // Sessão
@@ -14,7 +27,9 @@ interface AppState {
   // Navegação
   screen: Screen;
   focusedDimension: DimensionKey | undefined;
+  selectedDate: string;
   goTo: (s: Screen, dim?: DimensionKey) => void;
+  setSelectedDate: (date: string) => void;
 
   // Toast
   toast: string | null;
@@ -31,8 +46,30 @@ export const useApp = create<AppState>()(
 
       screen: 'home',
       focusedDimension: undefined,
-      goTo: (screen, focusedDimension) =>
-        set({ screen, focusedDimension }),
+      selectedDate: isoToday(),
+      goTo: (screen, focusedDimension) => {
+        if (screen === 'dimension') {
+          if (focusedDimension === 'skin' || focusedDimension === 'body') {
+            set({ screen: 'ritual', focusedDimension });
+            return;
+          }
+          if (focusedDimension === 'mind') {
+            set({ screen: 'mind', focusedDimension });
+            return;
+          }
+          if (focusedDimension === 'diet') {
+            set({ screen: 'diet', focusedDimension });
+            return;
+          }
+          if (focusedDimension === 'spirit') {
+            set({ screen: 'spirit', focusedDimension });
+            return;
+          }
+        }
+
+        set({ screen, focusedDimension });
+      },
+      setSelectedDate: (selectedDate) => set({ selectedDate }),
 
       toast: null,
       showToast: (toast) => {

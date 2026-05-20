@@ -60,6 +60,7 @@ export function Profile() {
   const userId = useApp((s) => s.userId);
   const setProfile = useApp((s) => s.setProfile);
   const showToast = useApp((s) => s.showToast);
+  const goTo = useApp((s) => s.goTo);
 
   const [name, setName] = useState(profile?.name ?? '');
   const [birthdate, setBirthdate] = useState(profile?.birthdate ?? '');
@@ -190,6 +191,18 @@ export function Profile() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="card stack settings-card">
+        <span className="eyebrow">configuração · app</span>
+        <button className="settings-row" onClick={() => goTo('products')}>
+          <span className="settings-mark">◌</span>
+          <span>
+            <strong>Produtos e rotina skincare</strong>
+            <small>cadastro, frequência e regeneração da ordem de uso</small>
+          </span>
+          <i>→</i>
+        </button>
       </section>
 
       <PreferenceBlock

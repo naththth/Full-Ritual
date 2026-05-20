@@ -44,7 +44,7 @@ export async function geminiChat(
  * Roda no servidor para garantir que a lógica clínica fique consistente.
  */
 export async function regenerateSkincareRoutine(timeOfDay: 'manha' | 'noite'): Promise<{
-  ordered_products: { id: string; order: number; reason: string }[];
+  ordered_products: { id: string; order: number; name: string; category?: string; reason: string }[];
 }> {
   if (!hasSupabase) throw new Error('Supabase não configurado.');
   const { data, error } = await supabase.functions.invoke('regenerate-routine', {

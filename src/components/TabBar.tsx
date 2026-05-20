@@ -1,29 +1,47 @@
 import { useApp } from '../store/useStore';
 
+type Tab = {
+  key: 'home' | 'ritual' | 'mind' | 'diet' | 'spirit' | 'insight';
+  label: string;
+  icon: string;
+};
+
 export function TabBar() {
   const screen = useApp((s) => s.screen);
+  const focusedDimension = useApp((s) => s.focusedDimension);
   const goTo = useApp((s) => s.goTo);
 
-  const tabs = [
-    { key: 'home',    label: 'Hoje',    icon: '○' },
-    { key: 'ritual',  label: 'Ritual',  icon: '◐', primary: true },
+  const tabs: Tab[] = [
+    { key: 'home', label: 'Hoje', icon: '○' },
+    { key: 'ritual', label: 'Ritual', icon: '◐' },
+    { key: 'mind', label: 'Mente', icon: '○' },
+    { key: 'diet', label: 'Dieta', icon: '◍' },
+    { key: 'spirit', label: 'Espírito', icon: '✧' },
     { key: 'insight', label: 'Insight', icon: '✦' },
-  ] as const;
+  ];
 
   return (
     <nav className="tabbar" aria-label="Navegação principal">
-      {tabs.map((t) => (
-        <button
-          key={t.key}
-          className={`tab ${screen === t.key ? 'tab--active' : ''} ${'primary' in t && t.primary ? 'tab--primary' : ''}`}
-          onClick={() => goTo(t.key as 'home' | 'ritual' | 'insight')}
-          aria-current={screen === t.key ? 'page' : undefined}
-          aria-label={t.label}
-        >
-          <span className="tab__icon" aria-hidden>{t.icon}</span>
-          <span className="tab__label">{t.label}</span>
-        </button>
-      ))}
+      {tabs.map((tab) => {
+        const active = screen === tab.key ||
+          (tab.key === 'ritual' && screen === 'dimension' && (focusedDimension === 'skin' || focusedDimension === 'body')) ||
+          (tab.key === 'mind' && screen === 'dimension' && focusedDimension === 'mind') ||
+          (tab.key === 'diet' && screen === 'dimension' && focusedDimension === 'diet') ||
+          (tab.key === 'spirit' && screen === 'dimension' && focusedDimension === 'spirit');
+
+        return (
+          <button
+            key={tab.key}
+            className={`tab ${active ? 'tab--active' : ''}`}
+            onClick={() => goTo(tab.key)}
+            aria-current={active ? 'page' : undefined}
+            aria-label={tab.label}
+          >
+            <span className="tab__icon" aria-hidden>{tab.icon}</span>
+            <span className="tab__label">{tab.label}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 }

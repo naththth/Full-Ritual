@@ -88,9 +88,9 @@
 /* =====================================================================
    UTILITÁRIOS TIPOGRÁFICOS (não usar fora dos componentes principais)
    ===================================================================== */
-.t-display-xl { font-family: var(--display); font-size: var(--fs-display-xl); line-height: 0.95; letter-spacing: -0.025em; font-weight: 400; }
-.t-display-lg { font-family: var(--display); font-size: var(--fs-display-lg); line-height: 1.0;  letter-spacing: -0.022em; font-weight: 400; }
-.t-display-md { font-family: var(--display); font-size: var(--fs-display-md); line-height: 1.05; letter-spacing: -0.02em;  font-weight: 400; }
+.t-display-xl { font-family: var(--display); font-size: var(--fs-display-xl); line-height: 0.95; letter-spacing: 0; font-weight: 400; }
+.t-display-lg { font-family: var(--display); font-size: var(--fs-display-lg); line-height: 1.0;  letter-spacing: 0; font-weight: 400; }
+.t-display-md { font-family: var(--display); font-size: var(--fs-display-md); line-height: 1.05; letter-spacing: 0;  font-weight: 400; }
 .t-display-italic { font-family: var(--display); font-style: italic; font-weight: 400; }
 
 .t-body-lg { font-family: var(--sans); font-size: var(--fs-body-lg); line-height: 1.5;  font-weight: 400; }

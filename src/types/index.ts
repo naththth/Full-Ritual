@@ -194,5 +194,5 @@ export interface DailyScore {
   score_mind: number;
   score_diet: number;
   score_spirit: number;
-  score_total: number;
+  score_total?: number;
 }

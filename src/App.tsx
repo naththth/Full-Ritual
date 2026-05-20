@@ -2,9 +2,15 @@ import { useEffect } from 'react';
 import { Home } from './screens/Home';
 import { Ritual } from './screens/Ritual';
 import { Insight } from './screens/Insight';
-import { Dimension } from './screens/Dimension';
 import { Profile } from './screens/Profile';
 import { Login } from './screens/Login';
+import { Chat } from './screens/Chat';
+import { Diet } from './screens/Diet';
+import { Evolution } from './screens/Evolution';
+import { Mind } from './screens/Mind';
+import { Products } from './screens/Products';
+import { Sleep } from './screens/Sleep';
+import { Spirit } from './screens/Spirit';
 import { TabBar } from './components/TabBar';
 import { useApp } from './store/useStore';
 import { supabase, hasSupabase } from './lib/supabase';
@@ -37,10 +43,19 @@ export default function App() {
         <div className="scroll">
           {screen === 'home' && <Home />}
           {screen === 'ritual' && <Ritual />}
+          {screen === 'mind' && <Mind />}
+          {screen === 'diet' && <Diet />}
+          {screen === 'spirit' && <Spirit />}
           {screen === 'insight' && <Insight />}
           {screen === 'profile' && <Profile />}
-          {screen === 'dimension' && focusedDimension && <Dimension dim={focusedDimension} />}
-          {/* TODO: products, sleep, evolution */}
+          {screen === 'products' && <Products />}
+          {screen === 'sleep' && <Sleep />}
+          {screen === 'evolution' && <Evolution />}
+          {screen === 'chat' && <Chat />}
+          {screen === 'dimension' && (focusedDimension === 'skin' || focusedDimension === 'body') && <Ritual />}
+          {screen === 'dimension' && focusedDimension === 'mind' && <Mind />}
+          {screen === 'dimension' && focusedDimension === 'diet' && <Diet />}
+          {screen === 'dimension' && focusedDimension === 'spirit' && <Spirit />}
         </div>
         <TabBar />
         {toast && (
