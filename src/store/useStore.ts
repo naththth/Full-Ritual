@@ -6,6 +6,7 @@ import { isoToday } from '../lib/dates';
 type Screen =
   | 'home'
   | 'ritual'
+  | 'body'
   | 'mind'
   | 'diet'
   | 'spirit'
@@ -13,6 +14,7 @@ type Screen =
   | 'dimension'
   | 'profile'
   | 'products'
+  | 'library'
   | 'sleep'
   | 'evolution'
   | 'chat';
@@ -49,8 +51,12 @@ export const useApp = create<AppState>()(
       selectedDate: isoToday(),
       goTo: (screen, focusedDimension) => {
         if (screen === 'dimension') {
-          if (focusedDimension === 'skin' || focusedDimension === 'body') {
+          if (focusedDimension === 'skin') {
             set({ screen: 'ritual', focusedDimension });
+            return;
+          }
+          if (focusedDimension === 'body') {
+            set({ screen: 'body', focusedDimension });
             return;
           }
           if (focusedDimension === 'mind') {

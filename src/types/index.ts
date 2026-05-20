@@ -150,6 +150,47 @@ export interface MindLog {
   notes: string | null;
 }
 
+// ---------- BIBLIOTECA / LEITURA ----------
+export type ReadingStatus = 'reading' | 'want_to_read' | 'read' | 'paused' | 'abandoned';
+
+export interface ReadingBook {
+  id: string;
+  user_id?: string;
+  source: 'goodreads' | 'manual' | 'import';
+  external_id: string | null;
+  title: string;
+  author: string;
+  isbn: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  pages: number | null;
+  current_page: number;
+  status: ReadingStatus;
+  rating: number | null;
+  date_read: string | null;
+  date_added: string | null;
+  shelves: string[];
+  review: string | null;
+  notes: string | null;
+  cover_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReadingSession {
+  id: string;
+  user_id?: string;
+  book_id: string;
+  date: string;
+  start_page: number | null;
+  end_page: number | null;
+  pages_read: number | null;
+  minutes: number | null;
+  feeling: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SpiritLog {
   id: string;
   user_id: string;

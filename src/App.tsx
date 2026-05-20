@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { Home } from './screens/Home';
 import { Ritual } from './screens/Ritual';
+import { Body } from './screens/Body';
 import { Insight } from './screens/Insight';
+import { Library } from './screens/Library';
 import { Profile } from './screens/Profile';
 import { Login } from './screens/Login';
 import { Chat } from './screens/Chat';
@@ -43,16 +45,19 @@ export default function App() {
         <div className="scroll">
           {screen === 'home' && <Home />}
           {screen === 'ritual' && <Ritual />}
+          {screen === 'body' && <Body />}
           {screen === 'mind' && <Mind />}
           {screen === 'diet' && <Diet />}
           {screen === 'spirit' && <Spirit />}
           {screen === 'insight' && <Insight />}
           {screen === 'profile' && <Profile />}
           {screen === 'products' && <Products />}
+          {screen === 'library' && <Library />}
           {screen === 'sleep' && <Sleep />}
           {screen === 'evolution' && <Evolution />}
           {screen === 'chat' && <Chat />}
-          {screen === 'dimension' && (focusedDimension === 'skin' || focusedDimension === 'body') && <Ritual />}
+          {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}
+          {screen === 'dimension' && focusedDimension === 'body' && <Body />}
           {screen === 'dimension' && focusedDimension === 'mind' && <Mind />}
           {screen === 'dimension' && focusedDimension === 'diet' && <Diet />}
           {screen === 'dimension' && focusedDimension === 'spirit' && <Spirit />}

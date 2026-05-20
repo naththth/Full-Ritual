@@ -203,6 +203,14 @@ export function Profile() {
           </span>
           <i>→</i>
         </button>
+        <button className="settings-row" onClick={() => goTo('library')}>
+          <span className="settings-mark settings-mark--mind">○</span>
+          <span>
+            <strong>Biblioteca e leitura</strong>
+            <small>importar Goodreads, cadastrar livros e registrar páginas</small>
+          </span>
+          <i>→</i>
+        </button>
       </section>
 
       <PreferenceBlock

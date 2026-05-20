@@ -1,7 +1,7 @@
 import { useApp } from '../store/useStore';
 
 type Tab = {
-  key: 'home' | 'ritual' | 'mind' | 'diet' | 'spirit' | 'insight';
+  key: 'home' | 'ritual' | 'body' | 'mind' | 'diet' | 'spirit' | 'insight';
   label: string;
   icon: string;
 };
@@ -13,7 +13,8 @@ export function TabBar() {
 
   const tabs: Tab[] = [
     { key: 'home', label: 'Hoje', icon: '○' },
-    { key: 'ritual', label: 'Ritual', icon: '◐' },
+    { key: 'ritual', label: 'Pele', icon: '◐' },
+    { key: 'body', label: 'Corpo', icon: '◑' },
     { key: 'mind', label: 'Mente', icon: '○' },
     { key: 'diet', label: 'Dieta', icon: '◍' },
     { key: 'spirit', label: 'Espírito', icon: '✧' },
@@ -24,7 +25,8 @@ export function TabBar() {
     <nav className="tabbar" aria-label="Navegação principal">
       {tabs.map((tab) => {
         const active = screen === tab.key ||
-          (tab.key === 'ritual' && screen === 'dimension' && (focusedDimension === 'skin' || focusedDimension === 'body')) ||
+          (tab.key === 'ritual' && screen === 'dimension' && focusedDimension === 'skin') ||
+          (tab.key === 'body' && screen === 'dimension' && focusedDimension === 'body') ||
           (tab.key === 'mind' && screen === 'dimension' && focusedDimension === 'mind') ||
           (tab.key === 'diet' && screen === 'dimension' && focusedDimension === 'diet') ||
           (tab.key === 'spirit' && screen === 'dimension' && focusedDimension === 'spirit');

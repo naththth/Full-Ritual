@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ring, MultiRing } from '../components/Ring';
-import { getMealItemsForDate, getRoutineTasks, MEALS, QUOTES } from '../data/ritualContent';
+import { MultiRing } from '../components/Ring';
+import { QUOTES } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { dateFromIso, isoToday, relativeDateLabel, weekDaysAround } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -54,14 +54,6 @@ export function Home() {
   const quote = QUOTES[(selectedDay.getDay() + 6) % 7];
   const cycle = cycleInfo(profile?.cycle_start, profile?.cycle_length ?? 28, selectedDay);
   const weekDays = useMemo(() => weekDaysAround(selectedDate), [selectedDate]);
-  const skinPreview = useMemo(() => getRoutineTasks('day', 'face', selectedDate).slice(0, 3), [selectedDate]);
-  const dietPreview = useMemo(() => {
-    const visibleMeals = MEALS.filter((meal) => meal.id !== 'intra').slice(0, 3);
-    return visibleMeals.map((meal) => ({
-      meal,
-      plan: getMealItemsForDate(meal, selectedDate),
-    }));
-  }, [selectedDate]);
   const scores = useMemo<Record<DimensionKey, number>>(() => {
     if (!dailyScore) return FALLBACK_SCORES;
     return {
@@ -75,8 +67,12 @@ export function Home() {
   const totalScore = Math.round((Object.values(scores).reduce((a, b) => a + b, 0) / 5) * 100);
 
   const openDimension = (key: DimensionKey) => {
-    if (key === 'skin' || key === 'body') {
+    if (key === 'skin') {
       goTo('ritual', key);
+      return;
+    }
+    if (key === 'body') {
+      goTo('body', key);
       return;
     }
     if (key === 'mind') {
@@ -213,48 +209,34 @@ export function Home() {
         </div>
       </section>
 
-      <WeatherCard
-        weather={weather}
-        loading={weatherLoading}
-        error={weatherError}
-        onRefresh={loadWeather}
-      />
-
-      <section className="daily-plan-grid">
-        <button className="card daily-plan-card daily-plan-card--skin" onClick={() => openDimension('skin')}>
-          <span className="eyebrow">pele · {shortDateLabel}</span>
-          <strong>{skinPreview[1]?.title ?? 'Rotina de barreira'}</strong>
-          <ul>
-            {skinPreview.map((task) => (
-              <li key={task.title}>{task.title}</li>
-            ))}
-          </ul>
-        </button>
-
-        <button className="card daily-plan-card daily-plan-card--diet" onClick={() => goTo('diet')}>
-          <span className="eyebrow">dieta · {shortDateLabel}</span>
-          <strong>{dietPreview[0]?.plan.items[0]?.title ?? 'Plano com presença'}</strong>
-          <ul>
-            {dietPreview.map(({ meal, plan }) => (
-              <li key={meal.id}>{meal.title}: {plan.items[0]?.title}</li>
-            ))}
-          </ul>
-        </button>
+      <section className="card card--ai quote-card">
+        <p>{quote}</p>
       </section>
 
-      <section className="card card--ai stack">
-        <span className="eyebrow">frase · {shortDateLabel}</span>
-        <p className="t-display-md" style={{ color: 'var(--ivory)' }}>{quote}</p>
-      </section>
-
-      <section className="card card--ai stack">
-        <span className="eyebrow">insight · atualizando</span>
-        <p className="t-display-md" style={{ color: 'var(--ivory)' }}>
-          {latestInsight?.title ?? 'Quando você dorme menos de seis horas, sua pele aparece reativa.'}
-        </p>
-        <p className="t-body" style={{ color: 'rgba(245,238,223,0.78)' }}>
-          {latestInsight?.body ?? 'Hoje vale priorizar a barreira: menos ácidos, mais reparação.'}
-        </p>
+      <section className="card card--ai insight-review-card">
+        <span className="eyebrow">review · {shortDateLabel}</span>
+        <div className="insight-number-grid">
+          <button onClick={() => goTo('sleep')}>
+            <strong>6h12</strong>
+            <span>sono</span>
+          </button>
+          <button onClick={() => goTo('evolution')}>
+            <strong>{cycle.day}</strong>
+            <span>ciclo</span>
+          </button>
+          <button onClick={() => goTo('body')}>
+            <strong>{Math.round(scores.body * 10)}/10</strong>
+            <span>energia</span>
+          </button>
+        </div>
+        <div className="insight-copy">
+          <p className="insight-title">
+            {latestInsight?.title ?? 'Quando você dorme menos de seis horas, sua pele aparece reativa.'}
+          </p>
+          <p className="t-body">
+            {latestInsight?.body ?? 'Hoje vale priorizar a barreira: menos ácidos, mais reparação.'}
+          </p>
+        </div>
         <button
           className="btn btn--full"
           style={{ background: 'var(--ivory)', color: 'var(--chocolate)' }}
@@ -264,48 +246,17 @@ export function Home() {
         </button>
       </section>
 
-      <section className="metric-grid">
-        <MiniMetric label="sono" value="6h12" onClick={() => goTo('sleep')} />
-        <MiniMetric label="ciclo" value={`${cycle.day}`} onClick={() => goTo('evolution')} />
-        <MiniMetric label="energia" value={`${Math.round(scores.body * 10)}/10`} onClick={() => goTo('ritual')} />
-      </section>
+      <WeatherCard
+        weather={weather}
+        loading={weatherLoading}
+        error={weatherError}
+        onRefresh={loadWeather}
+      />
 
-      <section className="quick-grid">
-        <button className="card quick-card quick-card--ai" onClick={() => goTo('chat')}>
-          <span className="eyebrow">IA</span>
-          <strong>conversar agora</strong>
-        </button>
-        <button className="card quick-card" onClick={() => goTo('diet')}>
-          <span className="eyebrow">dieta</span>
-          <strong>refeições e fotos</strong>
-        </button>
-        <button className="card quick-card" onClick={() => goTo('spirit')}>
-          <span className="eyebrow">espírito</span>
-          <strong>intenção do dia</strong>
-        </button>
-      </section>
-
-      <section className="stack">
-        <span className="eyebrow">dimensões · entrar</span>
-        {(Object.keys(DIMENSIONS) as DimensionKey[]).map((key) => (
-          <button
-            key={key}
-            onClick={() => openDimension(key)}
-            className="card dimension-row"
-          >
-            <Ring size={48} stroke={5} value={scores[key]} color={DIMENSIONS[key].color}>
-              <span style={{ fontSize: 18 }}>{DIMENSIONS[key].glyph}</span>
-            </Ring>
-            <div style={{ flex: 1 }}>
-              <div className="t-body" style={{ fontWeight: 500 }}>{DIMENSIONS[key].label}</div>
-              <div className="t-body-sm muted">
-                {Math.round(scores[key] * 100)}% · {dimensionDestinationLabel(key)}
-              </div>
-            </div>
-            <span style={{ fontSize: 20, color: 'var(--chocolate-soft)' }}>→</span>
-          </button>
-        ))}
-      </section>
+      <button className="card home-ai-card" onClick={() => goTo('chat')}>
+        <span className="eyebrow">IA · conversa</span>
+        <strong>abrir chat com presença</strong>
+      </button>
     </div>
   );
 }
@@ -343,13 +294,6 @@ function DaySelector({
       })}
     </div>
   );
-}
-
-function dimensionDestinationLabel(key: DimensionKey) {
-  if (key === 'skin' || key === 'body') return 'abrir ritual';
-  if (key === 'mind') return 'abrir mente';
-  if (key === 'diet') return 'abrir dieta';
-  return 'abrir espírito';
 }
 
 async function fetchWeather(latitude: number, longitude: number, source: WeatherSource): Promise<WeatherData> {
@@ -507,13 +451,4 @@ function weatherCare(weather: WeatherData): WeatherCare[] {
         : 'Use o clima como âncora: intenção simples, menos pressa e fechamento do dia mais limpo.',
     },
   ];
-}
-
-function MiniMetric({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
-  return (
-    <button className="card metric-card" onClick={onClick}>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </button>
-  );
 }
