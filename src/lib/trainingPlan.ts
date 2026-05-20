@@ -260,46 +260,65 @@ Finalizador: 100 elevações laterais — 4×25 · desc 30s`,
 function buildCorrida(intensity: IntensityLevel, profile: TrainingProfile): SessionContent {
   const pace = profile.corrida_pace_min_per_km;
   const raceNote = profile.corrida_has_race && hasMeaningfulEventInfo(profile.corrida_race_info)
-    ? `\n↳ Temporada: ${profile.corrida_race_info}` : '';
+    ? `\n\nTemporada: ${profile.corrida_race_info} — adapte esforço se estiver em fase de prova.` : '';
 
   if (intensity === 'easy') {
     return {
       title: 'corrida · regenerativa',
       blocks: [
-        { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '5 min', content: 'Caminhada progressiva · respiração nasal' },
-        { id: 'main', icon: '◆', title: 'trote Z1', duration: '20–25 min',
-          content: `RPE 3–4${pace ? ` · abaixo de ${pace}/km` : ''} · FC Z1 exclusivamente\nSe FC subir para Z2: reduza ou caminhe — objetivo é flush metabólico` },
+        { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '5 min',
+          content: `BLOCO 1 — 5 min de caminhada progressiva\n• Comece em ritmo lento e acelere aos poucos\n• Respiração nasal: entra pelo nariz, sai pela boca` },
+        { id: 'main', icon: '◆', title: 'trote contínuo Z1', duration: '20–25 min',
+          content: `BLOCO PRINCIPAL — 20-25 min de trote leve em Z1\n• RPE 3-4 (você consegue cantar sem ofegar)${pace ? `\n• Ritmo: MAIS LENTO que ${pace}/km (ritmo confortável)` : ''}\n• Frequência cardíaca: Z1 exclusivamente\n\nOBJETIVO da sessão: flush metabólico — ativa parasimpático sem cansar.\n\nSe a frequência cardíaca subir para Z2 espontaneamente: reduza o ritmo ou volte para caminhada.` },
         { id: 'cooldown', icon: '○', title: 'desaquecimento', duration: '5 min',
-          content: 'Caminhada + panturrilha · quadríceps · flexor de quadril' + raceNote },
+          content: `BLOCO 1 — 3 min de caminhada lenta\nBLOCO 2 — 2 min de alongamento dinâmico:\n• panturrilha — 30s cada lado\n• quadríceps — 30s cada lado\n• flexor de quadril — 30s cada lado${raceNote}` },
       ],
     };
   }
 
   if (intensity === 'hard') {
+    const total = Math.max(40, profile.session_minutes - 10);
+    const mainMin = Math.max(20, total - 20); // warmup 10 + cooldown 10
+    const z2min = Math.round(mainMin * 0.8);
+    const z3min = mainMin - z2min;
+    const fuelNeeded = mainMin >= 60;
     return {
       title: 'corrida · longão',
       blocks: [
-        { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '10 min', content: 'Trote Z1 progressivo para Z2' },
-        { id: 'main', icon: '◆', title: 'base Z2 + progressão Z3',
-          content: `80% do tempo — Z2 · RPE 5–6 · conversa possível${pace ? ` · ~${pace}/km` : ''} · cad 170–180ppm\n20% final — Z3 · RPE 6–7 · progressão natural\n↳ A partir de 60min: gel/banana a cada 40–45min · 400–600ml/h` },
+        { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '10 min',
+          content: `BLOCO 1 — 5 min de caminhada acelerando\nBLOCO 2 — 5 min de trote leve em Z1 (RPE 4)\n• Subir gradual até alcançar zona Z2 confortável\n• Sem ofegar` },
+        { id: 'main', icon: '◆', title: 'base aeróbica + progressão final', duration: `${mainMin} min`,
+          content: `BLOCO 1 — ${z2min} min em Z2 (RPE 5-6)\n• Conversa completa possível${pace ? `\n• Ritmo alvo: ~${pace}/km` : ''}\n• Cadência: 170-180 passos/min\n• Mantenha estável — sem acelerar\n\nBLOCO 2 (final) — ${z3min} min em Z3 (RPE 6-7)\n• Progressão natural, sem forçar\n• Última parte da sessão = onde adaptação aeróbica se consolida\n• Termine forte mas sem sprint${fuelNeeded ? `\n\nNUTRIÇÃO em rota (sessão >60min):\n• Gel ou banana a cada 40-45min\n• 400-600ml de água por hora\n• Comece a hidratar/comer no minuto 40, não espere ter fome ou sede` : ''}` },
         { id: 'cooldown', icon: '○', title: 'desaquecimento', duration: '10 min',
-          content: 'Caminhada + rolo: panturrilha · IT · fáscia plantar' + raceNote },
+          content: `BLOCO 1 — 5 min de trote muito leve em Z1\n• Deixa a frequência cardíaca cair gradualmente\n\nBLOCO 2 — 5 min de caminhada + alongamento\n• panturrilha — 30s cada lado\n• banda iliotibial (lateral da coxa) — 30s cada lado\n• fáscia plantar (sola do pé) — 30s cada lado${raceNote}` },
       ],
     };
   }
 
   const pace600 = calcPaceFor600(pace);
+  const pace5k = pace ? calcPace5kPerKm(pace) : null;
   return {
-    title: 'corrida · intervalado',
+    title: 'corrida · intervalado · 6 × 600m',
     blocks: [
       { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '12 min',
-        content: 'Trote Z1→Z2 progressivo + 4 strides 80m a 75% esforço' },
-      { id: 'main', icon: '◆', title: '6 × 600m', duration: '~25 min',
-        content: `Z4–Z5 · RPE 8–9${pace600 ? ` · alvo ~${pace600}/600m` : ''}\nRec: 90s trote lento entre reps\nConsistência > velocidade. Última rep = mesma cadência que a 1ª` },
+        content: `BLOCO 1 — 8 min de trote leve em Z1 (RPE 3-4)\n• Solta as pernas progressivamente\n• Sem pressa, sem acelerar\n\nBLOCO 2 — 2 min em Z2 (RPE 5)\n• Eleva um pouco o ritmo, prepara o corpo\n\nBLOCO 3 — 4 × 80m strides (acelerações)\n• Cada stride: ~20s de aceleração em 75% do esforço\n• 30s de caminhada entre cada\n• NÃO é sprint — educa os movimentos rápidos` },
+      { id: 'main', icon: '◆', title: '6 × 600m em Z4-Z5', duration: '~25 min',
+        content: `6 REPETIÇÕES de 600m em Z4-Z5 (RPE 8-9)\n${pace600 ? `• Ritmo alvo por 600m: ~${pace600}` : ''}\n${pace5k ? `• Equivale a ~${pace5k}/km (pace de prova 5K)` : ''}\n• Respiração: forçada, frases curtas só\n\nRECUPERAÇÃO entre cada repetição:\n• 90s de trote MUITO lento em Z1\n• Não pare — mantenha movimento\n\nVOLUME TOTAL:\n• 3.6 km em tiros + ~0.9 km recuperando = ~4.5 km\n\nDICAS DE EXECUÇÃO:\n• Consistência > velocidade máxima\n• A última repetição deve ter o MESMO ritmo da primeira\n• Se sentir que não vai conseguir manter, reduza no 2º tiro — não desande` },
       { id: 'cooldown', icon: '○', title: 'volta calma', duration: '15 min',
-        content: 'Z1 + isquio · panturrilha · glúteo' + raceNote },
+        content: `BLOCO 1 — 10 min de trote muito leve em Z1\n• Permite que a frequência cardíaca caia gradualmente\n\nBLOCO 2 — 5 min de alongamento estático\n• isquiotibiais — 1 min cada lado\n• panturrilha — 1 min cada lado\n• glúteo (pigeon pose) — 1 min cada lado\n• fáscia plantar (sola do pé) — rolinho ou bola por 1 min cada${raceNote}` },
     ],
   };
+}
+
+function calcPace5kPerKm(pace: string | null): string {
+  if (!pace) return '';
+  const parts = pace.split(':');
+  if (parts.length !== 2) return '';
+  const totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  const fiveKsec = Math.round(totalSeconds * 0.95); // ~5% mais rápido que confortável
+  const m = Math.floor(fiveKsec / 60);
+  const s = fiveKsec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function buildPedal(intensity: IntensityLevel, profile: TrainingProfile): SessionContent {
@@ -324,15 +343,20 @@ function buildPedal(intensity: IntensityLevel, profile: TrainingProfile): Sessio
   }
 
   if (intensity === 'hard') {
+    const total = Math.max(60, profile.session_minutes);
+    const mainMin = Math.max(30, total - 25); // warmup 15 + cooldown 10
+    const z2min = Math.round(mainMin * 0.7);
+    const z3min = Math.round(mainMin * 0.2);
+    const z4min = mainMin - z2min - z3min;
     return {
       title: 'pedal · longo',
       blocks: [
         { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '15 min',
-          content: `Z1→Z2 progressivo${pw(0.46, 0.75)}\nNo rolo: suba potência aos poucos, sem sprintar. Cadência 85–95rpm.` },
-        { id: 'main', icon: '◆', title: 'endurance Z2 + progressão',
-          content: `Bloco 1: base longa — 70% do tempo · Z2${pw(0.56, 0.75)} · RPE 5–6 · cad 85–95rpm\nBloco 2: progressão controlada — 20% do tempo · Z3${pw(0.76, 0.90)} · RPE 6–7 · cad 88–95rpm\nBloco 3: fechamento forte — 10% final · Z4${pw(0.91, 1.05)} · RPE 7–8 · não deixe cadência cair abaixo de 80rpm\nNutrição no rolo — >60min: 60–90g CHO/hora · 500–700ml/h + eletrólitos\nTécnica — quadril estável, tronco quieto e pressão constante nos pedais.\nLeitura do rolo — ${trainerNote}` },
+          content: `Z1 → Z2 progressivo${pw(0.46, 0.75)}\nSuba potência aos poucos, sem arrancadas. Cadência 85–95rpm.` },
+        { id: 'main', icon: '◆', title: 'endurance + progressão', duration: `${mainMin} min`,
+          content: `Bloco 1 — base longa: ${z2min} min em Z2${pw(0.56, 0.75)} · RPE 5–6 · cadência 85–95rpm\nBloco 2 — progressão controlada: ${z3min} min em Z3${pw(0.76, 0.90)} · RPE 6–7 · cadência 88–95rpm\nBloco 3 — fechamento forte: ${z4min} min em Z4${pw(0.91, 1.05)} · RPE 7–8 · cadência mínima 80rpm\nNutrição em sessões acima de 60min: 60–90g de carboidrato/hora · 500–700ml/hora + eletrólitos\nTécnica: quadril estável, tronco quieto, pressão constante nos pedais.\nLeitura do rolo: ${trainerNote}` },
         { id: 'cooldown', icon: '○', title: 'desaquecimento', duration: '10 min',
-          content: `Z1 leve${pw(0.40, 0.55)}\nDepois do rolo: glúteo médio · TFL · panturrilha, 60s cada.` + eventNote },
+          content: `Z1 leve${pw(0.40, 0.55)}\nAlongue: glúteo médio · tensor da fáscia (lateral da coxa) · panturrilha — 60s cada.` + eventNote },
       ],
     };
   }
@@ -341,11 +365,11 @@ function buildPedal(intensity: IntensityLevel, profile: TrainingProfile): Sessio
     title: 'pedal · base qualidade',
     blocks: [
       { id: 'warmup', icon: '◇', title: 'aquecimento', duration: '10 min',
-        content: `Z1→Z2 progressivo${pw(0.46, 0.75)}\nNo rolo: aumente a carga em rampa, mantendo cadência 85–95rpm e respiração controlada.` },
-      { id: 'main', icon: '◆', title: '3 × 10min Z3',
-        content: `Bloco 1 — 10min Z3${pw(0.76, 0.90)} · RPE 6–7 · cad 88–95rpm\nRecuperação — 5min Z2${pw(0.56, 0.75)} · respiração volta sem zerar esforço\nBloco 2 — 10min Z3${pw(0.76, 0.90)} · mesma potência do bloco 1, sem heroísmo\nRecuperação — 5min Z2${pw(0.56, 0.75)} · solte ombros e mandíbula\nBloco 3 — 10min Z3${pw(0.76, 0.90)} · feche estável, não em sprint\nTécnica no rolo — raspe o chão no retorno do pedal (6h→12h), quadril quieto e pressão constante.\nLeitura do rolo — ${trainerNote}` + eventNote },
+        content: `Z1 → Z2 progressivo${pw(0.46, 0.75)}\nAumente a carga em rampa, cadência 85–95rpm, respiração controlada.` },
+      { id: 'main', icon: '◆', title: '3 × 10min em Z3', duration: '40 min',
+        content: `Bloco 1 — 10 min em Z3${pw(0.76, 0.90)} · RPE 6–7 · cadência 88–95rpm\nRecuperação — 5 min em Z2${pw(0.56, 0.75)} · respiração baixa sem zerar o esforço\nBloco 2 — 10 min em Z3${pw(0.76, 0.90)} · mesma potência do bloco 1, sem heroísmo\nRecuperação — 5 min em Z2${pw(0.56, 0.75)} · solte ombros e mandíbula\nBloco 3 — 10 min em Z3${pw(0.76, 0.90)} · feche estável, não em sprint\nTécnica: "raspe o chão" no retorno do pedal (das 6h às 12h do ciclo), quadril quieto e pressão constante.\nLeitura do rolo: ${trainerNote}` + eventNote },
       { id: 'cooldown', icon: '○', title: 'volta calma', duration: '10 min',
-        content: `Z1 leve${pw(0.46, 0.55)}\nCadência solta, respiração baixa e sem buscar potência.` },
+        content: `Z1 leve${pw(0.46, 0.55)}\nCadência solta, respiração baixa, sem buscar potência.` },
     ],
   };
 }

@@ -48,6 +48,7 @@ export async function uploadFitAndEvaluate({
   workout: GarminWorkout;
   parsed_data: Record<string, unknown>;
   ai_feedback: string;
+  ai_adjustments: WorkoutAdjustments;
 }> {
   if (!hasSupabase) throw new Error('Supabase não configurado.');
 
@@ -68,6 +69,7 @@ export async function uploadFitAndEvaluate({
     workout: GarminWorkout;
     parsed_data: Record<string, unknown>;
     ai_feedback: string;
+    ai_adjustments: WorkoutAdjustments;
   }>('evaluate-workout', {
     body: {
       file_path: uploaded.path,
@@ -79,4 +81,21 @@ export async function uploadFitAndEvaluate({
   if (error) throw new Error(error.message);
   if (!data?.workout) throw new Error('Avaliação vazia do treino.');
   return data;
+}
+
+export interface WorkoutAdjustments {
+  performance: {
+    level: 'under' | 'par' | 'over';
+    quality?: 'poor' | 'good' | 'excellent';
+    summary: string;
+  };
+  context?: {
+    verdict: 'progress' | 'maintenance' | 'caution' | 'overreach';
+    factors: string[];
+    summary: string;
+  };
+  water: { extra_ml: number; note: string };
+  energy: { level: 'low' | 'normal' | 'high'; note: string };
+  next_workout: { changes: boolean; summary: string };
+  skin: { changes: boolean; summary: string };
 }

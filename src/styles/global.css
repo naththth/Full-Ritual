@@ -2943,6 +2943,219 @@ input[type="range"] {
   white-space: pre-line;
 }
 
+/* =====================================================================
+   FIT ADJUSTMENTS — feedback estruturado pós upload
+   ===================================================================== */
+.fit-adjustments {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+/* ---- Card base ---- */
+.fit-adj-perf,
+.fit-adj-context {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 253, 248, 0.96);
+  border: 1px solid color-mix(in srgb, var(--adj-color, var(--body)) 22%, rgba(74,44,34,0.08));
+  box-shadow: 0 6px 18px rgba(74,44,34,0.04);
+  display: grid;
+  gap: 14px;
+}
+
+/* ---- Header row (ícone + tags) ---- */
+.fit-adj-perf-head,
+.fit-adj-context-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.fit-adj-perf-icon,
+.fit-adj-context-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--adj-color, var(--body));
+  color: var(--ivory);
+  font-size: 17px;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--adj-color, var(--body)) 30%, transparent);
+}
+
+.fit-adj-perf-labels {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.fit-adj-perf-tag,
+.fit-adj-context-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--adj-color, var(--body));
+}
+
+/* Pill de qualidade — mesma altura que badges das células */
+.fit-adj-quality-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 99px;
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ---- Corpo do card (texto da IA) ---- */
+.fit-adj-perf p,
+.fit-adj-context p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--chocolate);
+}
+
+/* ---- Fatores como chips ---- */
+.fit-adj-factors {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fit-adj-factors li {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 5px 10px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--adj-color, var(--mind)) 10%, rgba(74,44,34,0.04));
+  color: var(--chocolate);
+  border: 1px solid color-mix(in srgb, var(--adj-color, var(--mind)) 18%, transparent);
+  line-height: 1.2;
+}
+
+/* =====================================================================
+   GRID 2×2 — água · energia · próximo · pele
+   ===================================================================== */
+.fit-adj-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fit-adj-item {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.92);
+  border: 1px solid rgba(74,44,34,0.09);
+  box-shadow: 0 4px 12px rgba(74,44,34,0.03);
+  min-height: 132px;
+}
+
+.fit-adj-item--auto {
+  border-color: rgba(84,104,62,0.22);
+  background: linear-gradient(180deg, rgba(84,104,62,0.04), rgba(255,253,248,0.96));
+}
+
+.fit-adj-item--has-change {
+  border-color: rgba(184,90,31,0.28);
+  background: linear-gradient(180deg, rgba(184,90,31,0.04), rgba(255,253,248,0.96));
+}
+
+.fit-adj-item-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 46px;
+}
+
+.fit-adj-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(74,44,34,0.6);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.fit-adj-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: rgba(74,44,34,0.07);
+  color: rgba(74,44,34,0.55);
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.fit-adj-badge--auto {
+  background: rgba(84,104,62,0.16);
+  color: var(--diet);
+}
+
+.fit-adj-badge--change {
+  background: rgba(184,90,31,0.18);
+  color: var(--body);
+}
+
+.fit-adj-item strong {
+  font-family: var(--display);
+  font-size: 19px;
+  line-height: 1.1;
+  font-weight: 400;
+  color: var(--chocolate);
+  margin: 2px 0 0;
+}
+
+.fit-adj-item p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(74,44,34,0.7);
+  align-self: start;
+}
+
+@media (max-width: 370px) {
+  .fit-adj-grid { grid-template-columns: 1fr; }
+  .fit-adj-item { min-height: 0; }
+}
+
 @media (max-width: 370px) {
   .fit-upload-card {
     gap: 13px;
@@ -3375,56 +3588,39 @@ input[type="range"] {
 
 /* ── CONGRATS ──────────────────────────────────────────────── */
 .training-congrats {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 10px 13px;
-  padding: 15px 16px 17px;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid rgba(184,90,31,0.18);
-  background:
-    radial-gradient(circle at 92% 18%, rgba(184,90,31,0.14), transparent 34%),
-    linear-gradient(145deg, rgba(184,90,31,0.13), rgba(251,246,235,0.92));
-  border-color: rgba(184,90,31,0.26);
-  min-width: 0;
+  background: linear-gradient(145deg, rgba(184,90,31,0.10), rgba(251,246,235,0.92));
+  border-color: rgba(184,90,31,0.24);
 }
 
 .training-congrats--inline {
   box-shadow: none;
-  border-radius: 22px;
-}
-
-.training-congrats::after {
-  content: "treino concluído";
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--body);
+  border-radius: 18px;
 }
 
 .training-congrats-mark {
-  width: 46px;
-  height: 46px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--body);
   color: var(--ivory);
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
 .training-congrats p {
-  grid-column: 1 / -1;
   margin: 0;
-  font-family: var(--display);
-  font-size: clamp(22px, 6.4vw, 28px);
-  line-height: 1.12;
-  font-weight: 400;
-  color: var(--chocolate);
-  max-width: 100%;
-  text-wrap: balance;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--chocolate-soft, rgba(74,44,34,0.78));
 }
 
 /* ── WEEK STRIP PROGRESS ────────────────────────────────────── */

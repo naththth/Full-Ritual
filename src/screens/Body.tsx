@@ -952,6 +952,7 @@ const CONGRATS = [
 type FitAnalysis = {
   feedback: string;
   parsed_data: Record<string, unknown>;
+  adjustments?: import('../lib/trainingApi').WorkoutAdjustments;
 };
 
 function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, onRegenerate }: PlanViewProps) {
@@ -1040,6 +1041,7 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
       setFitAnalysis({
         feedback: result.ai_feedback,
         parsed_data: result.parsed_data,
+        adjustments: result.ai_adjustments,
       });
       showToast('treino importado e avaliado.');
     } catch (error) {
@@ -1160,9 +1162,15 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
         </label>
         {fitAnalysis && (
           <div className="fit-feedback">
-            <span className="eyebrow">feedback · IA</span>
             <FitMetricsGrid data={fitAnalysis.parsed_data} />
-            <p>{fitAnalysis.feedback}</p>
+            {fitAnalysis.adjustments ? (
+              <FitAdjustmentsView adjustments={fitAnalysis.adjustments} />
+            ) : (
+              <>
+                <span className="eyebrow">feedback · IA</span>
+                <p>{fitAnalysis.feedback}</p>
+              </>
+            )}
           </div>
         )}
       </section>
@@ -1188,6 +1196,113 @@ function ftpZones(ftp: number) {
     { name: 'Z5', range: `${Math.round(ftp * 1.06)}–${Math.round(ftp * 1.20)}W`, label: 'VO₂máx' },
     { name: 'Z6', range: `> ${Math.round(ftp * 1.21)}W`, label: 'anaeróbico' },
   ];
+}
+
+const PERF_LABEL: Record<'under' | 'par' | 'over', { label: string; color: string; icon: string }> = {
+  under: { label: 'abaixo do planejado', color: 'var(--mind)', icon: '↓' },
+  par:   { label: 'dentro do planejado', color: 'var(--diet)', icon: '✓' },
+  over:  { label: 'acima do planejado',  color: 'var(--body)', icon: '↑' },
+};
+const QUALITY_LABEL: Record<'poor' | 'good' | 'excellent', { label: string; color: string }> = {
+  poor:      { label: 'execução irregular',      color: 'var(--body)' },
+  good:      { label: 'execução consistente',    color: 'var(--diet)' },
+  excellent: { label: 'execução excelente',      color: 'var(--mind)' },
+};
+const VERDICT_LABEL: Record<'progress' | 'maintenance' | 'caution' | 'overreach', { label: string; color: string; icon: string }> = {
+  progress:    { label: 'evolução em curso',      color: 'var(--diet)',   icon: '↗' },
+  maintenance: { label: 'manutenção',             color: 'var(--mind)',   icon: '→' },
+  caution:     { label: 'atenção',                color: 'var(--body)',   icon: '!' },
+  overreach:   { label: 'risco de sobrecarga',    color: 'var(--spirit)', icon: '⚠' },
+};
+const ENERGY_LABEL: Record<'low' | 'normal' | 'high', { label: string; color: string }> = {
+  low:    { label: 'energia baixa esperada',   color: 'var(--body)' },
+  normal: { label: 'energia normal esperada',  color: 'var(--diet)' },
+  high:   { label: 'energia alta disponível',  color: 'var(--mind)' },
+};
+
+function FitAdjustmentsView({ adjustments }: { adjustments: import('../lib/trainingApi').WorkoutAdjustments }) {
+  const perf = PERF_LABEL[adjustments.performance.level] ?? PERF_LABEL.par;
+  const quality = adjustments.performance.quality ? QUALITY_LABEL[adjustments.performance.quality] : null;
+  const verdict = adjustments.context?.verdict ? VERDICT_LABEL[adjustments.context.verdict] : null;
+  const energy = ENERGY_LABEL[adjustments.energy.level] ?? ENERGY_LABEL.normal;
+
+  return (
+    <div className="fit-adjustments">
+      {/* Performance — visual de destaque */}
+      <div className="fit-adj-perf" style={{ '--adj-color': perf.color } as React.CSSProperties}>
+        <div className="fit-adj-perf-head">
+          <span className="fit-adj-perf-icon">{perf.icon}</span>
+          <div className="fit-adj-perf-labels">
+            <span className="fit-adj-perf-tag">{perf.label}</span>
+            {quality && (
+              <span className="fit-adj-quality-tag" style={{ color: quality.color, borderColor: quality.color }}>
+                {quality.label}
+              </span>
+            )}
+          </div>
+        </div>
+        <p>{adjustments.performance.summary}</p>
+      </div>
+
+      {/* Análise cruzada */}
+      {adjustments.context && verdict && (
+        <div className="fit-adj-context" style={{ '--adj-color': verdict.color } as React.CSSProperties}>
+          <div className="fit-adj-context-head">
+            <span className="fit-adj-context-icon">{verdict.icon}</span>
+            <span className="fit-adj-context-label">análise cruzada · {verdict.label}</span>
+          </div>
+          {adjustments.context.factors.length > 0 && (
+            <ul className="fit-adj-factors">
+              {adjustments.context.factors.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
+          <p>{adjustments.context.summary}</p>
+        </div>
+      )}
+
+      <div className="fit-adj-grid">
+        <div className="fit-adj-item fit-adj-item--auto">
+          <div className="fit-adj-item-head">
+            <span className="fit-adj-label">água</span>
+            <span className="fit-adj-badge fit-adj-badge--auto">aplicado</span>
+          </div>
+          <strong>{adjustments.water.extra_ml > 0 ? `+${adjustments.water.extra_ml} ml` : 'sem ajuste'}</strong>
+          <p>{adjustments.water.note}</p>
+        </div>
+
+        <div className="fit-adj-item fit-adj-item--auto">
+          <div className="fit-adj-item-head">
+            <span className="fit-adj-label">energia</span>
+            <span className="fit-adj-badge fit-adj-badge--auto">aplicado</span>
+          </div>
+          <strong>{energy.label}</strong>
+          <p>{adjustments.energy.note}</p>
+        </div>
+
+        <div className={`fit-adj-item fit-adj-item--suggest${adjustments.next_workout.changes ? ' fit-adj-item--has-change' : ''}`}>
+          <div className="fit-adj-item-head">
+            <span className="fit-adj-label">próximo treino</span>
+            <span className={`fit-adj-badge${adjustments.next_workout.changes ? ' fit-adj-badge--change' : ''}`}>
+              {adjustments.next_workout.changes ? 'sugestão' : 'sem mudança'}
+            </span>
+          </div>
+          <p>{adjustments.next_workout.summary}</p>
+        </div>
+
+        <div className={`fit-adj-item fit-adj-item--suggest${adjustments.skin.changes ? ' fit-adj-item--has-change' : ''}`}>
+          <div className="fit-adj-item-head">
+            <span className="fit-adj-label">pele</span>
+            <span className={`fit-adj-badge${adjustments.skin.changes ? ' fit-adj-badge--change' : ''}`}>
+              {adjustments.skin.changes ? 'sugestão' : 'sem mudança'}
+            </span>
+          </div>
+          <p>{adjustments.skin.summary}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FitMetricsGrid({ data }: { data: Record<string, unknown> }) {

@@ -78,19 +78,18 @@ Deno.serve(async (req: Request) => {
     });
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt() }],
-          },
+          systemInstruction: { parts: [{ text: systemPrompt() }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.55,
-            maxOutputTokens: 6500,
+            maxOutputTokens: 8000,
             responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 }, // desativa "thinking" do 2.5 — economiza tokens e evita truncamento
           },
         }),
       },
@@ -98,14 +97,34 @@ Deno.serve(async (req: Request) => {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error('Gemini error:', errText);
+      console.error('Gemini HTTP error:', errText);
       return json({ error: 'falha ao gerar plano com IA' }, 502);
     }
 
     const geminiData = await geminiRes.json();
+    const finishReason = geminiData?.candidates?.[0]?.finishReason;
     const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const parsed = parseJson(rawText);
-    const planJson = sanitizePlan(parsed?.plan_json ?? parsed, weekStart, trainingProfile);
+
+    if (!rawText) {
+      console.error('Gemini empty response. finishReason:', finishReason, 'data:', JSON.stringify(geminiData).slice(0, 500));
+      return json({ error: 'resposta vazia da IA' }, 502);
+    }
+
+    let parsed: any;
+    try {
+      parsed = parseJson(rawText);
+    } catch (parseErr) {
+      console.error('parseJson failed. rawText (first 1000):', rawText.slice(0, 1000), 'err:', parseErr);
+      return json({ error: 'JSON inválido da IA' }, 502);
+    }
+
+    let planJson: any;
+    try {
+      planJson = sanitizePlan(parsed?.plan_json ?? parsed, weekStart, trainingProfile);
+    } catch (sanitizeErr) {
+      console.error('sanitizePlan failed. parsed structure:', JSON.stringify(parsed).slice(0, 1000), 'err:', sanitizeErr);
+      return json({ error: 'estrutura inválida do plano' }, 502);
+    }
 
     await supabase
       .from('training_plans')
@@ -214,11 +233,15 @@ function parseJson(text: string): any {
 }
 
 function sanitizePlan(raw: any, weekStart: string, profile: any) {
-  if (!Array.isArray(raw)) throw new Error('Plano inválido: plan_json não é array.');
-  if (raw.length !== 7) throw new Error('Plano inválido: precisa ter 7 dias.');
+  if (!Array.isArray(raw)) throw new Error('plan_json não é array');
+
+  // Tolera plano com mais ou menos de 7 dias — pad com descanso, trunca se passar
+  let normalized = [...raw];
+  while (normalized.length < 7) normalized.push({ modality: 'rest', modalities: ['rest'], title: 'descanso ativo', blocks: [] });
+  if (normalized.length > 7) normalized = normalized.slice(0, 7);
 
   const start = new Date(`${weekStart}T00:00:00`);
-  return raw.map((day, index) => {
+  return normalized.map((day, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
     const blocks = Array.isArray(day.blocks) ? day.blocks : [];
