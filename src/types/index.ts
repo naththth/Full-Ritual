@@ -213,6 +213,97 @@ export interface CycleLog {
   symptoms: string[];
 }
 
+// ---------- TREINO (Body) ----------
+export type TrainingModality = 'corrida' | 'pedal' | 'musculacao' | 'lpo';
+export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+export type PreferredTime = 'morning' | 'afternoon' | 'evening' | 'flexible';
+export type TrainingGoal = 'fat_loss' | 'muscle_gain' | 'performance' | 'maintenance' | 'event';
+export type ConsistencyBand = 'under_6m' | '6m_1y' | '1y_3y' | 'over_3y';
+export type RunLocation = 'street' | 'treadmill' | 'both';
+export type PedalType = 'roadbike' | 'mtb' | 'indoor';
+export type StrengthLocation = 'gym' | 'home' | 'outdoor';
+export type StrengthSplit = 'fullbody' | 'upper_lower' | 'ppl' | 'bro_split' | 'other';
+export type LpoMovements = 'basics' | 'full_oly';
+export type PlanSource = 'onboarding' | 'feedback' | 'manual';
+export type IntensityLevel = 'easy' | 'moderate' | 'hard' | 'max';
+
+export interface TrainingProfile {
+  user_id: string;
+  modalities: TrainingModality[];
+  available_days: DayOfWeek[];
+  preferred_time: PreferredTime;
+  session_minutes: number;
+  main_goal: TrainingGoal;
+  consistency_band: ConsistencyBand | null;
+  limitations: string | null;
+
+  corrida_pace_min_per_km: string | null;
+  corrida_max_distance_km: number | null;
+  corrida_has_race: boolean;
+  corrida_race_info: string | null;
+  corrida_location: RunLocation | null;
+
+  pedal_ftp_watts: number | null;
+  pedal_type: PedalType | null;
+  pedal_weekly_km: number | null;
+  pedal_has_event: boolean;
+  pedal_event_info: string | null;
+
+  strength_location: StrengthLocation | null;
+  strength_equipment: string | null;
+  strength_split: StrengthSplit | null;
+
+  lpo_saturday_9am: boolean;
+  lpo_has_coach: boolean;
+  lpo_movements: LpoMovements | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingBlock {
+  id: string;
+  icon: string;
+  title: string;
+  content: string;
+  duration?: string;
+  modalityGroup?: string; // para dias com múltiplos treinos
+}
+
+export interface TrainingDay {
+  day_index: number;
+  date: string;
+  modality: TrainingModality | 'rest';
+  modalities: (TrainingModality | 'rest')[];
+  title: string;
+  details: string;           // string plana (backward compat / fallback)
+  blocks: TrainingBlock[];   // blocos estruturados com checkboxes
+  duration_min: number;
+  intensity: IntensityLevel;
+  notes?: string;
+}
+
+export interface TrainingPlan {
+  id: string;
+  user_id: string;
+  week_start_date: string;   // segunda da semana
+  plan_json: TrainingDay[];
+  generated_at: string;
+  generated_from: PlanSource;
+  is_active: boolean;
+}
+
+export interface GarminWorkout {
+  id: string;
+  user_id: string;
+  date: string;
+  modality: TrainingModality;
+  file_url: string | null;
+  parsed_data: Record<string, unknown> | null;
+  ai_feedback: string | null;
+  created_at: string;
+}
+
 // ---------- INSIGHTS DA IA ----------
 export interface Insight {
   id: string;

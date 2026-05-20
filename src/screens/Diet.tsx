@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getDefaultMealVariant, MEALS, TRAINING_OPTIONS } from '../data/ritualContent';
+import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useLocalState } from '../lib/useLocalState';
@@ -14,19 +14,11 @@ interface MealState {
 
 interface DietState {
   water: number;
-  training: string;
-  trainingDuration: string;
-  trainingIntensity: 'leve' | 'moderado' | 'forte';
-  trainingNotes: string;
   meals: Record<string, MealState>;
 }
 
 const initialDiet: DietState = {
   water: 0,
-  training: 'none',
-  trainingDuration: '',
-  trainingIntensity: 'moderado',
-  trainingNotes: '',
   meals: {},
 };
 
@@ -38,11 +30,7 @@ export function Diet() {
   const [saving, setSaving] = useState(false);
   const dateLabel = relativeDateLabel(selectedDate);
 
-  const target = diet.training === 'pedal' || diet.training === 'corrida'
-    ? 3.2
-    : diet.training === 'lpo' || diet.training === 'musculacao'
-      ? 3
-      : 2.5;
+  const target = 2.5;
 
   const updateMeal = (mealId: string, patch: Partial<MealState>) => {
     setDiet((current) => {
@@ -93,19 +81,6 @@ export function Diet() {
     setSaving(true);
     try {
       if (hasSupabase && userId) {
-        if (diet.training !== 'none' && Number(diet.trainingDuration) > 0) {
-          const { error: workoutError } = await supabase.from('workout_logs').insert({
-            user_id: userId,
-            date: selectedDate,
-            modality: trainingToModality(diet.training),
-            duration_min: Number(diet.trainingDuration),
-            intensity: intensityToNumber(diet.trainingIntensity),
-            type: diet.training,
-            notes: diet.trainingNotes || null,
-          });
-          if (workoutError) throw workoutError;
-        }
-
         for (const meal of MEALS) {
           const state = diet.meals[meal.id];
           if (!state) continue;
@@ -133,8 +108,6 @@ export function Diet() {
     }
   };
 
-  const activeTraining = TRAINING_OPTIONS.find((option) => option.id === diet.training) ?? TRAINING_OPTIONS[0];
-
   return (
     <div className="screen stack-md">
       <header className="stack">
@@ -143,59 +116,9 @@ export function Diet() {
           Comer com <em className="t-display-italic">presença.</em>
         </h1>
         <p className="t-body muted">
-          Plano do dia com substituições, água, treino e foto da refeição.
+          Plano do dia com substituições, água e foto da refeição.
         </p>
       </header>
-
-      <section className="card stack">
-        <span className="eyebrow">treino do dia</span>
-        <div className="segmented">
-          {TRAINING_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              className={diet.training === option.id ? 'segmented--active' : ''}
-              onClick={() => setDiet((current) => ({ ...current, training: option.id }))}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="training-detail-grid">
-          <label className="compact-field">
-            <span>duração</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              placeholder="min"
-              value={diet.trainingDuration}
-              onChange={(event) => setDiet((current) => ({ ...current, trainingDuration: event.target.value }))}
-            />
-          </label>
-          <label className="compact-field">
-            <span>intensidade</span>
-            <select
-              value={diet.trainingIntensity}
-              onChange={(event) => setDiet((current) => ({
-                ...current,
-                trainingIntensity: event.target.value as DietState['trainingIntensity'],
-              }))}
-            >
-              <option value="leve">leve</option>
-              <option value="moderado">moderado</option>
-              <option value="forte">forte</option>
-            </select>
-          </label>
-        </div>
-        <textarea
-          className="field training-notes"
-          rows={3}
-          placeholder="observação do treino: suor, energia, dor, recuperação..."
-          value={diet.trainingNotes}
-          onChange={(event) => setDiet((current) => ({ ...current, trainingNotes: event.target.value }))}
-        />
-        <p className="t-body-sm muted">{activeTraining.advice}</p>
-      </section>
 
       <section className="card card--dim stack" style={{ '--dim': 'var(--diet)' } as React.CSSProperties}>
         <span className="eyebrow">água e recuperação</span>
@@ -288,17 +211,4 @@ export function Diet() {
       </button>
     </div>
   );
-}
-
-function trainingToModality(training: string) {
-  if (training === 'pedal') return 'ciclismo';
-  if (training === 'corrida') return 'corrida';
-  if (training === 'yoga') return 'yoga';
-  if (training === 'musculacao' || training === 'lpo') return 'forca';
-  return 'caminhada';
-}
-
-function intensityToNumber(intensity: DietState['trainingIntensity']) {
-  const map = { leve: 3, moderado: 6, forte: 9 };
-  return map[intensity];
 }

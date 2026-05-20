@@ -29,7 +29,11 @@ const SUPABASE_ORIGIN = getSupabaseOrigin(SUPABASE_URL);
 const SUPABASE_KEY = isValidAnonKey(SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : undefined;
 
 function isValidAnonKey(key: string | undefined) {
-  return Boolean(key && key.length > 80 && !key.includes('...') && key !== 'placeholder');
+  if (!key) return false;
+  if (key.includes('...') || key === 'placeholder') return false;
+  // Aceita o JWT anon legado (eyJ... longo) ou a publishable key nova (sb_publishable_...)
+  if (key.startsWith('sb_publishable_')) return key.length > 30;
+  return key.length > 80;
 }
 
 if (!SUPABASE_ORIGIN || !SUPABASE_KEY) {

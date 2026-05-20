@@ -14,7 +14,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "db:push": "supabase db push",
-    "fn:deploy": "supabase functions deploy gemini-chat && supabase functions deploy regenerate-routine"
+    "fn:deploy": "supabase functions deploy gemini-chat && supabase functions deploy regenerate-routine && supabase functions deploy generate-training-plan && supabase functions deploy evaluate-workout"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

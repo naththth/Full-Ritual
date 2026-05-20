@@ -29,6 +29,7 @@ export function Ritual() {
   const selectedDate = useApp((s) => s.selectedDate);
 
   const [period, setPeriod] = useState<RoutinePeriod>('day');
+  const [openAreas, setOpenAreas] = useState<Set<RoutineArea>>(new Set());
   const [checks, setChecks] = useLocalState<RoutineChecks>(`full-ritual-routine-checks-${selectedDate}`, {});
   const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(`full-ritual-skin-photo-${selectedDate}`, null);
   const [energy, setEnergy] = useState(6);
@@ -51,6 +52,18 @@ export function Ritual() {
   const toggleRoutine = (area: RoutineArea, index: number) => {
     const key = `${period}:${area}:${index}`;
     setChecks((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const toggleArea = (area: RoutineArea) => {
+    setOpenAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(area)) {
+        next.delete(area);
+      } else {
+        next.add(area);
+      }
+      return next;
+    });
   };
 
   const markArea = (area: RoutineArea) => {
@@ -139,33 +152,47 @@ export function Ritual() {
         </div>
       </header>
 
-      {(['face', 'body', 'aromas'] as RoutineArea[]).map((area) => (
-        <section key={area} className="card stack">
-          <div className="row-between">
-            <span className="eyebrow">{areaLabel(area)}</span>
-            <button className="chip" onClick={() => markArea(area)}>marcar bloco</button>
-          </div>
-          <div className="task-list">
-            {routine[area].map((task, index) => {
-              const checked = Boolean(checks[`${period}:${area}:${index}`]);
-              return (
-                <button
-                  key={task.title}
-                  className={`task-row ${checked ? 'task-row--done' : ''}`}
-                  onClick={() => toggleRoutine(area, index)}
-                >
-                  <span className="task-check">{checked ? '✓' : ''}</span>
-                  <span>
-                    <strong>{task.title}</strong>
-                    <small>{task.description}</small>
-                    <em>{task.tag}</em>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {(['face', 'body', 'aromas'] as RoutineArea[]).map((area) => {
+        const isOpen = openAreas.has(area);
+        const areaChecked = routine[area].filter((_, index) =>
+          Boolean(checks[`${period}:${area}:${index}`])
+        ).length;
+        return (
+          <section key={area} className="card routine-accordion">
+            <button className="accordion-trigger" onClick={() => toggleArea(area)}>
+              <div className="accordion-trigger-left">
+                <span className="eyebrow">{areaLabel(area)}</span>
+                <span className="accordion-count">{areaChecked}/{routine[area].length}</span>
+              </div>
+              <span className={`accordion-chevron${isOpen ? ' accordion-chevron--open' : ''}`}>›</span>
+            </button>
+            {isOpen && (
+              <div className="accordion-body stack">
+                <button className="chip" onClick={() => markArea(area)}>marcar tudo</button>
+                <div className="task-list">
+                  {routine[area].map((task, index) => {
+                    const checked = Boolean(checks[`${period}:${area}:${index}`]);
+                    return (
+                      <button
+                        key={task.title}
+                        className={`task-row ${checked ? 'task-row--done' : ''}`}
+                        onClick={() => toggleRoutine(area, index)}
+                      >
+                        <span className="task-check">{checked ? '✓' : ''}</span>
+                        <span>
+                          <strong>{task.title}</strong>
+                          <small>{task.description}</small>
+                          <em>{task.tag}</em>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })}
 
       <section className="card stack">
         <span className="eyebrow">check-in · energia</span>

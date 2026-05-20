@@ -1,19 +1,78 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MultiRing } from '../components/Ring';
-import { QUOTES } from '../data/ritualContent';
+import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { dateFromIso, isoToday, relativeDateLabel, weekDaysAround } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { DIMENSIONS, type DailyScore, type DimensionKey, type Insight } from '../types';
 import { useApp } from '../store/useStore';
 
-const FALLBACK_SCORES: Record<DimensionKey, number> = {
-  skin: 0.62,
-  body: 0.75,
-  mind: 0.48,
-  diet: 0.55,
-  spirit: 0.8,
-};
+function readLocal<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function computeLocalScores(date: string): Record<DimensionKey, number> {
+  // Skin: % de tarefas do ritual marcadas no período dia
+  const checks = readLocal<Record<string, boolean>>(`full-ritual-routine-checks-${date}`, {});
+  const skinTotal =
+    getRoutineTasks('day', 'face', date).length +
+    ROUTINES.day.body.length +
+    ROUTINES.day.aromas.length;
+  const skinDone = Object.entries(checks).filter(([k, v]) => k.startsWith('day:') && v).length;
+
+  // Spirit: campos preenchidos (humor, intenção, gratidão)
+  const spirit = readLocal<{ mood: string; intention: string; gratitude: string }>(
+    `full-ritual-spirit-${date}`,
+    { mood: '', intention: '', gratitude: '' },
+  );
+  const spiritScore =
+    [spirit.mood, spirit.intention, spirit.gratitude].filter((s) => s.trim().length > 0).length / 3;
+
+  // Diet: água (0-6 copos) + refeições registradas (0-3)
+  const diet = readLocal<{ water: number; meals: Record<string, unknown> }>(
+    `full-ritual-diet-${date}`,
+    { water: 0, meals: {} },
+  );
+  const waterScore = Math.min(diet.water / 6, 1);
+  const mealScore = Math.min(Object.keys(diet.meals ?? {}).length / 3, 1);
+
+  // Mind: práticas com notas ou sensação diferente da padrão
+  const mind = readLocal<{ practiceLogs: Record<string, { notes: string; feeling: string }> }>(
+    `full-ritual-mind-${date}`,
+    { practiceLogs: {} },
+  );
+  const engagedPractices = Object.values(mind.practiceLogs ?? {}).filter(
+    (l) => l.notes?.trim() || l.feeling !== 'clara',
+  ).length;
+
+  return {
+    skin: skinTotal > 0 ? Math.min(skinDone / skinTotal, 1) : 0,
+    body: computeLocalWorkoutScore(date) ?? 0,
+    mind: Math.min(engagedPractices / 3, 1),
+    diet: waterScore * 0.5 + mealScore * 0.5,
+    spirit: spiritScore,
+  };
+}
+
+function computeLocalWorkoutScore(date: string): number | null {
+  const summary = readLocal<{ done: number; total: number } | null>(
+    `full-ritual-workout-summary-${date}`,
+    null,
+  );
+  if (summary && summary.total > 0) {
+    return Math.max(0, Math.min(summary.done / summary.total, 1));
+  }
+
+  const checks = readLocal<Record<string, boolean>>(`full-ritual-workout-blocks-${date}`, {});
+  const keys = Object.keys(checks);
+  if (keys.length === 0) return null;
+  return Math.max(0, Math.min(keys.filter((key) => checks[key]).length / keys.length, 1));
+}
 
 type WeatherSource = 'local' | 'fallback';
 
@@ -55,16 +114,34 @@ export function Home() {
   const cycle = cycleInfo(profile?.cycle_start, profile?.cycle_length ?? 28, selectedDay);
   const weekDays = useMemo(() => weekDaysAround(selectedDate), [selectedDate]);
   const scores = useMemo<Record<DimensionKey, number>>(() => {
-    if (!dailyScore) return FALLBACK_SCORES;
+    const localScores = computeLocalScores(selectedDate);
+    const localWorkoutScore = computeLocalWorkoutScore(selectedDate);
+    if (!dailyScore) return localScores;
     return {
-      skin: dailyScore.score_skin / 100,
-      body: dailyScore.score_body / 100,
-      mind: dailyScore.score_mind / 100,
-      diet: dailyScore.score_diet / 100,
-      spirit: dailyScore.score_spirit / 100,
+      skin: localScores.skin || dailyScore.score_skin / 100,
+      body: localWorkoutScore ?? dailyScore.score_body / 100,
+      mind: localScores.mind || dailyScore.score_mind / 100,
+      diet: localScores.diet || dailyScore.score_diet / 100,
+      spirit: localScores.spirit || dailyScore.score_spirit / 100,
     };
-  }, [dailyScore]);
+  }, [dailyScore, selectedDate]);
   const totalScore = Math.round((Object.values(scores).reduce((a, b) => a + b, 0) / 5) * 100);
+
+  const sleepMin = useMemo(() => {
+    const logs = readLocal<Array<{ date: string; duration_min: number | null }>>('full-ritual-sleep', []);
+    return logs.find((l) => l.date === selectedDate)?.duration_min ?? null;
+  }, [selectedDate]);
+
+  const sleepLabel = sleepMin !== null
+    ? `${Math.floor(sleepMin / 60)}h${String(sleepMin % 60).padStart(2, '0')}`
+    : '—';
+
+  const energyLabel = dailyScore ? `${Math.round(scores.body * 10)}/10` : '—';
+
+  const dailyInsight = useMemo(
+    () => buildDailyInsight(sleepMin, cycle, latestInsight),
+    [sleepMin, cycle, latestInsight],
+  );
 
   const openDimension = (key: DimensionKey) => {
     if (key === 'skin') {
@@ -172,8 +249,7 @@ export function Home() {
           Bom dia, <em className="t-display-italic">{(profile?.name ?? 'você').split(' ')[0]}.</em>
         </h1>
         <p className="t-body" style={{ color: 'var(--chocolate-soft)', maxWidth: 340, margin: '12px 0 0' }}>
-          {latestInsight?.title ?? 'Hoje, comece pela pele.'}{' '}
-          {cycle.phase === 'lutea' ? 'A fase lútea pede menos cobrança e mais água.' : 'A noite pediu mais calma do que o corpo deu.'}
+          {quote}
         </p>
 
         <DaySelector days={weekDays} selectedDate={selectedDate} onSelect={setSelectedDate} />
@@ -209,33 +285,25 @@ export function Home() {
         </div>
       </section>
 
-      <section className="card card--ai quote-card">
-        <p>{quote}</p>
-      </section>
-
       <section className="card card--ai insight-review-card">
         <span className="eyebrow">review · {shortDateLabel}</span>
         <div className="insight-number-grid">
           <button onClick={() => goTo('sleep')}>
-            <strong>6h12</strong>
+            <strong>{sleepLabel}</strong>
             <span>sono</span>
           </button>
           <button onClick={() => goTo('evolution')}>
-            <strong>{cycle.day}</strong>
-            <span>ciclo</span>
+            <strong>dia {cycle.day}</strong>
+            <span>{phaseLabel(cycle.phase)}</span>
           </button>
           <button onClick={() => goTo('body')}>
-            <strong>{Math.round(scores.body * 10)}/10</strong>
+            <strong>{energyLabel}</strong>
             <span>energia</span>
           </button>
         </div>
         <div className="insight-copy">
-          <p className="insight-title">
-            {latestInsight?.title ?? 'Quando você dorme menos de seis horas, sua pele aparece reativa.'}
-          </p>
-          <p className="t-body">
-            {latestInsight?.body ?? 'Hoje vale priorizar a barreira: menos ácidos, mais reparação.'}
-          </p>
+          <p className="insight-title">{dailyInsight.title}</p>
+          <p className="t-body">{dailyInsight.body}</p>
         </div>
         <button
           className="btn btn--full"
@@ -372,10 +440,6 @@ function WeatherCard({
               <strong>{Math.round(weather.uv)}</strong>
               <small>índice UV</small>
             </div>
-            <div className="weather-pill">
-              <strong>{weather.source === 'local' ? 'local' : 'SP'}</strong>
-              <small>base</small>
-            </div>
           </div>
 
           <div className="weather-care-grid">
@@ -451,4 +515,61 @@ function weatherCare(weather: WeatherData): WeatherCare[] {
         : 'Use o clima como âncora: intenção simples, menos pressa e fechamento do dia mais limpo.',
     },
   ];
+}
+
+function phaseLabel(phase: string) {
+  const labels: Record<string, string> = {
+    menstrual: 'menstrual',
+    folicular: 'folicular',
+    ovulatoria: 'ovulação',
+    lutea: 'lútea',
+  };
+  return labels[phase] ?? 'ciclo';
+}
+
+function buildDailyInsight(
+  sleepMin: number | null,
+  cycle: { phase: string; day: number },
+  fallback: { title: string; body: string } | null,
+): { title: string; body: string } {
+  const shortSleep = sleepMin !== null && sleepMin < 360;
+  const goodSleep = sleepMin !== null && sleepMin >= 420;
+  const { phase, day } = cycle;
+
+  if (phase === 'menstrual' && shortSleep) return {
+    title: 'Recuperação dupla: fase e sono curto.',
+    body: 'Reduza estímulos e ativos fortes. Priorize barreira, hidratação e leveza.',
+  };
+  if (phase === 'menstrual') return {
+    title: `Dia ${day} — fase menstrual.`,
+    body: 'Corpo em renovação. Rituais lentos, textura leve e menos cobrança hoje.',
+  };
+  if (phase === 'folicular' && goodSleep) return {
+    title: 'Energia em ascensão, sono bem usado.',
+    body: 'Janela ideal para rotina completa, ativos como vitamina C e movimento.',
+  };
+  if (phase === 'folicular') return {
+    title: `Dia ${day} — fase folicular.`,
+    body: 'Corpo em reconstrução. Mantenha consistência: proteína, sono e rotina.',
+  };
+  if (phase === 'ovulatoria') return {
+    title: 'Pico energético do ciclo.',
+    body: 'Melhor momento para ativos mais fortes, treino intenso e presença total.',
+  };
+  if (phase === 'lutea' && shortSleep) return {
+    title: 'Fase lútea com sono curto.',
+    body: 'Sensibilidade da pele elevada. Hidratação, menos ácidos e mais descanso.',
+  };
+  if (phase === 'lutea') return {
+    title: `Dia ${day} — fase lútea.`,
+    body: 'Priorize regeneração. O corpo pede mais, mas a consistência é o que vale.',
+  };
+  if (shortSleep) return {
+    title: 'Sono abaixo do ideal.',
+    body: 'Pele reativa e barreira fragilizada. Produtos reparadores e rotina leve.',
+  };
+  return {
+    title: fallback?.title ?? 'Presença primeiro, performance depois.',
+    body: fallback?.body ?? 'Use os dados do dia para ajustar — não para cobrar.',
+  };
 }
