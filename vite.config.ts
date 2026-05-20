@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // IMPORTANT: troque 'full-ritual' pelo nome real do repositório no GitHub.
 // Se for usar domínio customizado apontado para a raiz, mude para base: '/'.
 export default defineConfig({
-  base: '/full-ritual/',
+  base: '/Full-Ritual/',
   plugins: [
     react(),
     VitePWA({
@@ -19,8 +19,8 @@ export default defineConfig({
         background_color: '#F5EEDF',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/full-ritual/',
-        start_url: '/full-ritual/',
+        scope: '/Full-Ritual/',
+        start_url: '/Full-Ritual/',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
