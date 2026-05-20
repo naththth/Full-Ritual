@@ -9,7 +9,15 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const signIn = async () => {
+  const createProfile = async (userId: string) => {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id: userId, name: email.split('@')[0] || 'voce' }, { onConflict: 'id' });
+
+    if (profileError) console.warn('[Full Ritual] Perfil nao criado automaticamente.', profileError);
+  };
+
+  const authenticate = async (mode: 'signin' | 'signup') => {
     if (!hasSupabase) {
       setUser('local-demo');
       return;
@@ -17,19 +25,26 @@ export function Login() {
     setLoading(true);
     setError(null);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (mode === 'signup') {
+      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
 
-    if (signInError?.message === 'Invalid login credentials') {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
       setLoading(false);
       if (signUpError) { setError(signUpError.message); return; }
-      if (signUpData.user) setUser(signUpData.user.id);
+      if (data.user) {
+        await createProfile(data.user.id);
+        setUser(data.user.id);
+      }
       return;
     }
 
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
     setLoading(false);
     if (signInError) { setError(signInError.message); return; }
-    if (data.user) setUser(data.user.id);
+    if (data.user) {
+      await createProfile(data.user.id);
+      setUser(data.user.id);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -106,17 +121,26 @@ export function Login() {
           placeholder="senha"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && signIn()}
+          onKeyDown={(e) => e.key === 'Enter' && authenticate('signin')}
           style={inputStyle}
         />
         <button
           className="btn btn--full"
           style={{ background: 'var(--ivory)', color: 'var(--chocolate)' }}
-          onClick={signIn}
+          onClick={() => authenticate('signin')}
           disabled={loading || (!email && hasSupabase)}
         >
           {loading ? 'entrando…' : hasSupabase ? 'entrar' : 'começar o primeiro ritual'}
         </button>
+        {hasSupabase && (
+          <button
+            style={{ color: 'var(--ivory)', opacity: 0.72, fontSize: 13, padding: 8 }}
+            onClick={() => authenticate('signup')}
+            disabled={loading || !email || !password}
+          >
+            criar conta
+          </button>
+        )}
         {error && <p style={{ color: 'var(--skin)', marginTop: 4, fontSize: 13 }}>{error}</p>}
       </div>
     </div>
