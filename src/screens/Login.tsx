@@ -5,25 +5,44 @@ import { useApp } from '../store/useStore';
 export function Login() {
   const setUser = useApp((s) => s.setUser);
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendMagic = async () => {
+  const signIn = async () => {
     if (!hasSupabase) {
-      // Modo demo: entra como usuário local sem auth
       setUser('local-demo');
       return;
     }
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
-    });
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (signInError?.message === 'Invalid login credentials') {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      setLoading(false);
+      if (signUpError) { setError(signUpError.message); return; }
+      if (signUpData.user) setUser(signUpData.user.id);
+      return;
+    }
+
     setLoading(false);
-    if (error) setError(error.message);
-    else setSent(true);
+    if (signInError) { setError(signInError.message); return; }
+    if (data.user) setUser(data.user.id);
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px 18px',
+    background: 'rgba(245,238,223,0.10)',
+    border: '1px solid rgba(245,238,223,0.20)',
+    color: 'var(--ivory)',
+    borderRadius: 999,
+    fontSize: 14,
+    textAlign: 'center',
+    outline: 'none',
+    boxSizing: 'border-box',
   };
 
   return (
@@ -35,7 +54,6 @@ export function Login() {
         padding: 40, textAlign: 'center',
       }}
     >
-      {/* Símbolo de 5 anéis concêntricos */}
       <svg width="116" height="116" viewBox="0 0 120 120" style={{ marginBottom: 22 }}>
         <circle cx="60" cy="60" r="46" stroke="rgba(245,238,223,0.12)" strokeWidth="6" fill="none" />
         <circle cx="60" cy="60" r="46" stroke="#D89A82" strokeWidth="6" fill="none"
@@ -75,41 +93,32 @@ export function Login() {
         O cuidado começa quando você volta para si.
       </p>
 
-      {sent ? (
-        <p style={{ marginTop: 30, fontSize: 14, opacity: 0.85 }}>
-          enviamos um link para <strong>{email}</strong>. <br />
-          abra no celular e o app abre por si.
-        </p>
-      ) : (
-        <div style={{ width: '100%', maxWidth: 320, marginTop: 32 }}>
-          <input
-            type="email"
-            placeholder="seu email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '14px 18px',
-              background: 'rgba(245,238,223,0.10)',
-              border: '1px solid rgba(245,238,223,0.20)',
-              color: 'var(--ivory)',
-              borderRadius: 999,
-              fontSize: 14,
-              textAlign: 'center',
-              outline: 'none',
-            }}
-          />
-          <button
-            className="btn btn--full"
-            style={{ marginTop: 12, background: 'var(--ivory)', color: 'var(--chocolate)' }}
-            onClick={sendMagic}
-            disabled={loading || (!email && hasSupabase)}
-          >
-            {loading ? 'enviando…' : hasSupabase ? 'enviar link mágico' : 'começar o primeiro ritual'}
-          </button>
-          {error && <p style={{ color: 'var(--skin)', marginTop: 10, fontSize: 13 }}>{error}</p>}
-        </div>
-      )}
+      <div style={{ width: '100%', maxWidth: 320, marginTop: 32, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input
+          type="email"
+          placeholder="seu email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={inputStyle}
+        />
+        <input
+          type="password"
+          placeholder="senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && signIn()}
+          style={inputStyle}
+        />
+        <button
+          className="btn btn--full"
+          style={{ background: 'var(--ivory)', color: 'var(--chocolate)' }}
+          onClick={signIn}
+          disabled={loading || (!email && hasSupabase)}
+        >
+          {loading ? 'entrando…' : hasSupabase ? 'entrar' : 'começar o primeiro ritual'}
+        </button>
+        {error && <p style={{ color: 'var(--skin)', marginTop: 4, fontSize: 13 }}>{error}</p>}
+      </div>
     </div>
   );
 }
