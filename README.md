@@ -123,7 +123,7 @@ pnpm dev
 1. **Criar o repositório** no GitHub e fazer push do código.
 2. Em **Settings → Pages**, definir Source = **GitHub Actions**.
 3. Em **Settings → Secrets and variables → Actions**, adicionar:
-   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_URL` com a Project URL limpa, no formato `https://<project-ref>.supabase.co` (sem `/rest/v1`, `/auth/v1` ou outro caminho)
    - `VITE_SUPABASE_ANON_KEY`
 4. Em `vite.config.ts`, ajustar `base` para o nome real do repo (ex: `/full-ritual/`).
 
