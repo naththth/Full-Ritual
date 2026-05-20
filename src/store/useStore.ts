@@ -13,7 +13,7 @@ interface AppState {
 
   // Navegação
   screen: Screen;
-  focusedDimension: DimensionKey | null;
+  focusedDimension: DimensionKey | undefined;
   goTo: (s: Screen, dim?: DimensionKey) => void;
 
   // Toast
@@ -30,8 +30,8 @@ export const useApp = create<AppState>()(
       setUser: (userId) => set({ userId }),
 
       screen: 'home',
-      focusedDimension: null,
-      goTo: (screen, focusedDimension = null) =>
+      focusedDimension: undefined,
+      goTo: (screen, focusedDimension) =>
         set({ screen, focusedDimension }),
 
       toast: null,

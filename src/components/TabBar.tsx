@@ -15,7 +15,7 @@ export function TabBar() {
       {tabs.map((t) => (
         <button
           key={t.key}
-          className={`tab ${screen === t.key ? 'tab--active' : ''} ${t.primary ? 'tab--primary' : ''}`}
+          className={`tab ${screen === t.key ? 'tab--active' : ''} ${'primary' in t && t.primary ? 'tab--primary' : ''}`}
           onClick={() => goTo(t.key as 'home' | 'ritual' | 'insight')}
           aria-current={screen === t.key ? 'page' : undefined}
           aria-label={t.label}
