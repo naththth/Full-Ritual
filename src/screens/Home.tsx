@@ -118,6 +118,7 @@ export function Home() {
   const [weatherError, setWeatherError] = useState<string | null>(null);
 
   const selectedDay = dateFromIso(selectedDate);
+  const greeting = timeOfDayGreeting();
   const dateLabel = selectedDay
     .toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
     .toLowerCase();
@@ -267,7 +268,7 @@ export function Home() {
         </div>
 
         <h1 className="t-display-lg" style={{ marginTop: 8 }}>
-          Bom dia, <em className="t-display-italic">{(profile?.name ?? 'você').split(' ')[0]}.</em>
+          {greeting}, <em className="t-display-italic">{(profile?.name ?? 'você').split(' ')[0]}.</em>
         </h1>
         <p className="t-body" style={{ color: 'var(--chocolate-soft)', maxWidth: 340, margin: '12px 0 0' }}>
           {quote}
@@ -333,6 +334,14 @@ export function Home() {
       </button>
     </div>
   );
+}
+
+function timeOfDayGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 5) return 'Boa noite';
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
 }
 
 const PETAL_DEEP: Record<string, string> = {

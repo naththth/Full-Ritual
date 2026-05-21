@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { BackButton } from '../components/BackButton';
 import { useApp } from '../store/useStore';
 import { supabase, hasSupabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
 import type {
-  SkinType, SportModality, MusicPref, ContentPref, SpiritTheme,
+  Profile as ProfileData, SkinType, SportModality, MusicPref, ContentPref, SpiritTheme,
 } from '../types';
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -71,6 +72,7 @@ export function Profile() {
   const [content, setContent] = useState<ContentPref[]>(profile?.content_prefs ?? []);
   const [themes, setThemes] = useState<SpiritTheme[]>(profile?.spirit_themes ?? []);
   const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.photo_url ?? null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     // Carrega perfil do banco se autenticado
@@ -109,6 +111,56 @@ export function Profile() {
     name, birthdate, skinType, sports, music, content, themes, photoUrl,
   });
 
+  const buildProfilePayload = () => ({
+    id: userId ?? profile?.id ?? 'local',
+    name: name.trim() || 'voce',
+    birthdate: birthdate || null,
+    skin_type: skinType,
+    sport_modalities: sports,
+    music_prefs: music,
+    content_prefs: content,
+    spirit_themes: themes,
+    photo_url: photoUrl,
+  });
+
+  const saveProfile = async (showSuccess = true) => {
+    const payload = buildProfilePayload();
+    setSaving(true);
+    try {
+      if (hasSupabase && userId) {
+        const { data, error } = await supabase.from('profiles').upsert(payload).select('*').single();
+        if (error) throw error;
+        if (data) setProfile(data as ProfileData);
+      } else {
+        const current = profile;
+        setProfile({
+          id: payload.id,
+          name: payload.name,
+          photo_url: payload.photo_url,
+          birthdate: payload.birthdate,
+          skin_type: payload.skin_type,
+          cycle_tracking: current?.cycle_tracking ?? false,
+          cycle_start: current?.cycle_start ?? null,
+          cycle_length: current?.cycle_length ?? 28,
+          sport_modalities: payload.sport_modalities,
+          music_prefs: payload.music_prefs,
+          content_prefs: payload.content_prefs,
+          spirit_themes: payload.spirit_themes,
+          ai_enabled: current?.ai_enabled ?? true,
+          notifications_enabled: current?.notifications_enabled ?? true,
+          created_at: current?.created_at ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+      if (showSuccess) showToast('ritual pessoal salvo.');
+    } catch (error) {
+      console.error(error);
+      showToast('não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useAutoSave(saveKey, async () => {
     if (!hasSupabase || !userId) return;
     const { error } = await supabase.from('profiles').upsert({
@@ -130,7 +182,8 @@ export function Profile() {
 
   return (
     <div className="screen stack-md">
-      <header className="stack">
+      <header className="screen-header stack">
+        <BackButton />
         <span className="eyebrow">perfil · ritual pessoal</span>
         <h1 className="t-display-lg">
           O que <em className="t-display-italic">rege</em> seus dias.
@@ -249,6 +302,10 @@ export function Profile() {
         selected={themes}
         onToggle={(v) => toggle(themes, v, setThemes)}
       />
+
+      <button className="btn btn--primary btn--full" onClick={() => void saveProfile()} disabled={saving}>
+        {saving ? 'salvando...' : 'salvar alterações'}
+      </button>
 
       <div style={{ height: 40 }} />
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BackButton } from '../components/BackButton';
 import { geminiChat } from '../lib/gemini';
 import { isoToday } from '../lib/dates';
 import { useLocalState } from '../lib/useLocalState';
@@ -72,7 +73,8 @@ export function Chat() {
 
   return (
     <div className="screen chat-screen">
-      <header className="stack">
+      <header className="screen-header stack">
+        <BackButton />
         <span className="eyebrow">chat IA · ritual</span>
         <h1 className="t-display-lg">
           Conversa com <em className="t-display-italic">presença.</em>

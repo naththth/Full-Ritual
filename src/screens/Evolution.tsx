@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { BackButton } from '../components/BackButton';
 import { DIMENSIONS, type Checkin, type DailyScore, type SleepLog } from '../types';
 import { buildAutomaticCorrelations } from '../lib/correlations';
 import { fiveWeekCycle } from '../lib/cycle';
@@ -48,7 +49,8 @@ export function Evolution() {
 
   return (
     <div className="screen stack-md">
-      <header className="stack">
+      <header className="screen-header stack">
+        <BackButton />
         <span className="eyebrow">evolução · 30 dias</span>
         <h1 className="t-display-lg">
           O ritual visto <em className="t-display-italic">de fora.</em>

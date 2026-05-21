@@ -4,7 +4,7 @@ import type { Profile, DimensionKey } from '../types';
 import { isoToday } from '../lib/dates';
 import { safeStringStorage } from '../lib/storage';
 
-type Screen =
+export type Screen =
   | 'home'
   | 'energy'
   | 'ritual'
@@ -20,6 +20,11 @@ type Screen =
   | 'evolution'
   | 'chat';
 
+interface NavigationEntry {
+  screen: Screen;
+  focusedDimension?: DimensionKey;
+}
+
 interface AppState {
   // Sessão
   userId: string | null;
@@ -30,8 +35,10 @@ interface AppState {
   // Navegação
   screen: Screen;
   focusedDimension: DimensionKey | undefined;
+  navigationStack: NavigationEntry[];
   selectedDate: string;
   goTo: (s: Screen, dim?: DimensionKey) => void;
+  goBack: () => void;
   setSelectedDate: (date: string) => void;
 
   // Toast
@@ -39,9 +46,21 @@ interface AppState {
   showToast: (msg: string) => void;
 }
 
+function resolveScreen(screen: Screen, focusedDimension?: DimensionKey): NavigationEntry {
+  if (screen !== 'dimension') return { screen, focusedDimension };
+
+  if (focusedDimension === 'skin') return { screen: 'ritual', focusedDimension };
+  if (focusedDimension === 'body') return { screen: 'body', focusedDimension };
+  if (focusedDimension === 'mind') return { screen: 'mind', focusedDimension };
+  if (focusedDimension === 'diet') return { screen: 'diet', focusedDimension };
+  if (focusedDimension === 'spirit') return { screen: 'spirit', focusedDimension };
+
+  return { screen, focusedDimension };
+}
+
 export const useApp = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       userId: null,
       profile: null,
       setProfile: (profile) => set({ profile }),
@@ -49,32 +68,39 @@ export const useApp = create<AppState>()(
 
       screen: 'home',
       focusedDimension: undefined,
+      navigationStack: [],
       selectedDate: isoToday(),
       goTo: (screen, focusedDimension) => {
-        if (screen === 'dimension') {
-          if (focusedDimension === 'skin') {
-            set({ screen: 'ritual', focusedDimension });
-            return;
-          }
-          if (focusedDimension === 'body') {
-            set({ screen: 'body', focusedDimension });
-            return;
-          }
-          if (focusedDimension === 'mind') {
-            set({ screen: 'mind', focusedDimension });
-            return;
-          }
-          if (focusedDimension === 'diet') {
-            set({ screen: 'diet', focusedDimension });
-            return;
-          }
-          if (focusedDimension === 'spirit') {
-            set({ screen: 'spirit', focusedDimension });
-            return;
-          }
+        const current = get();
+        const next = resolveScreen(screen, focusedDimension);
+        const isSameScreen = current.screen === next.screen && current.focusedDimension === next.focusedDimension;
+
+        set({
+          screen: next.screen,
+          focusedDimension: next.focusedDimension,
+          navigationStack: isSameScreen
+            ? current.navigationStack ?? []
+            : [...(current.navigationStack ?? []), {
+              screen: current.screen,
+              focusedDimension: current.focusedDimension,
+            }].slice(-12),
+        });
+      },
+      goBack: () => {
+        const current = get();
+        const stack = current.navigationStack ?? [];
+        const previous = stack[stack.length - 1];
+
+        if (!previous) {
+          set({ screen: 'home', focusedDimension: undefined, navigationStack: [] });
+          return;
         }
 
-        set({ screen, focusedDimension });
+        set({
+          screen: previous.screen,
+          focusedDimension: previous.focusedDimension,
+          navigationStack: stack.slice(0, -1),
+        });
       },
       setSelectedDate: (selectedDate) => set({ selectedDate }),
 
