@@ -64,6 +64,10 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployments/${STUCK_DEPLOYMENT_ID}/cancel"
           )"
 
+          if [ "$status" = "400" ] && grep -q "it's finished" /tmp/pages-cancel-response.txt; then
+            status="204"
+          fi
+
           if [ "$status" != "204" ] && [ "$status" != "404" ]; then
             cat /tmp/pages-cancel-response.txt
             exit 1
