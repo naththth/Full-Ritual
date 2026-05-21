@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Home } from './screens/Home';
+import { Energy } from './screens/Energy';
 import { Ritual } from './screens/Ritual';
 import { Body } from './screens/Body';
 import { Insight } from './screens/Insight';
@@ -11,7 +12,6 @@ import { Diet } from './screens/Diet';
 import { Evolution } from './screens/Evolution';
 import { Mind } from './screens/Mind';
 import { Products } from './screens/Products';
-import { Sleep } from './screens/Sleep';
 import { Spirit } from './screens/Spirit';
 import { TabBar } from './components/TabBar';
 import { useApp } from './store/useStore';
@@ -37,6 +37,14 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, [setUser]);
 
+  useEffect(() => {
+    const handleStorageError = () => {
+      useApp.getState().showToast('Armazenamento do celular cheio. A tela segue aberta, mas este registro pode nao salvar.');
+    };
+    window.addEventListener('full-ritual:storage-error', handleStorageError);
+    return () => window.removeEventListener('full-ritual:storage-error', handleStorageError);
+  }, []);
+
   if (!userId) return <Login />;
 
   return (
@@ -44,6 +52,7 @@ export default function App() {
       <main className="app">
         <div className="scroll">
           {screen === 'home' && <Home />}
+          {screen === 'energy' && <Energy />}
           {screen === 'ritual' && <Ritual />}
           {screen === 'body' && <Body />}
           {screen === 'mind' && <Mind />}
@@ -53,7 +62,6 @@ export default function App() {
           {screen === 'profile' && <Profile />}
           {screen === 'products' && <Products />}
           {screen === 'library' && <Library />}
-          {screen === 'sleep' && <Sleep />}
           {screen === 'evolution' && <Evolution />}
           {screen === 'chat' && <Chat />}
           {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}

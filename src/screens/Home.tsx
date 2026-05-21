@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MultiRing } from '../components/Ring';
 import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { dateFromIso, isoToday, relativeDateLabel, weekDaysAround } from '../lib/dates';
+import { readJson } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { DIMENSIONS, type DailyScore, type DimensionKey, type Insight } from '../types';
+import { type DailyScore, type DimensionKey, type Insight } from '../types';
 import { useApp } from '../store/useStore';
 
 function readLocal<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+  return readJson(key, fallback);
+}
+
+function filled(value: unknown) {
+  if (Array.isArray(value)) return value.some(filled);
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return Boolean(value);
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function computeLocalScores(date: string): Record<DimensionKey, number> {
@@ -25,29 +33,33 @@ function computeLocalScores(date: string): Record<DimensionKey, number> {
     ROUTINES.day.aromas.length;
   const skinDone = Object.entries(checks).filter(([k, v]) => k.startsWith('day:') && v).length;
 
-  // Spirit: campos preenchidos (humor, intenção, gratidão)
-  const spirit = readLocal<{ mood: string; intention: string; gratitude: string }>(
+  // Spirit: campos preenchidos. Humor/tema têm valores padrão e não devem inflar o score inicial.
+  const spirit = readLocal<{ intention?: unknown; relief?: unknown; gratitude?: unknown }>(
     `full-ritual-spirit-${date}`,
-    { mood: '', intention: '', gratitude: '' },
+    { intention: '', relief: '', gratitude: '' },
   );
   const spiritScore =
-    [spirit.mood, spirit.intention, spirit.gratitude].filter((s) => s.trim().length > 0).length / 3;
+    [spirit.intention, spirit.relief, spirit.gratitude].filter(filled).length / 3;
 
   // Diet: água (0-6 copos) + refeições registradas (0-3)
-  const diet = readLocal<{ water: number; meals: Record<string, unknown> }>(
+  const diet = readLocal<{ water?: unknown; meals?: unknown }>(
     `full-ritual-diet-${date}`,
     { water: 0, meals: {} },
   );
-  const waterScore = Math.min(diet.water / 6, 1);
-  const mealScore = Math.min(Object.keys(diet.meals ?? {}).length / 3, 1);
+  const water = typeof diet.water === 'number' ? diet.water : 0;
+  const mealScore = Math.min(Object.keys(objectValue(diet.meals)).length / 3, 1);
+  const waterScore = Math.min(water / 6, 1);
 
   // Mind: práticas com notas ou sensação diferente da padrão
-  const mind = readLocal<{ practiceLogs: Record<string, { notes: string; feeling: string }> }>(
+  const mind = readLocal<{ practiceLogs?: unknown }>(
     `full-ritual-mind-${date}`,
     { practiceLogs: {} },
   );
-  const engagedPractices = Object.values(mind.practiceLogs ?? {}).filter(
-    (l) => l.notes?.trim() || l.feeling !== 'clara',
+  const engagedPractices = Object.values(objectValue(mind.practiceLogs)).filter(
+    (log) => {
+      const l = objectValue(log);
+      return filled(l.notes) || (typeof l.feeling === 'string' && l.feeling !== 'clara');
+    },
   ).length;
 
   return {
@@ -125,7 +137,13 @@ export function Home() {
       spirit: localScores.spirit || dailyScore.score_spirit / 100,
     };
   }, [dailyScore, selectedDate]);
-  const totalScore = Math.round((Object.values(scores).reduce((a, b) => a + b, 0) / 5) * 100);
+  const energyFromCheckin = readLocal<{ energy?: number }>(`full-ritual-energy-${selectedDate}`, {}).energy;
+  const energyScoreNorm = typeof energyFromCheckin === 'number'
+    ? Math.max(0, Math.min(1, energyFromCheckin / 10))
+    : scores.body;
+  const totalScore = Math.round(
+    ((scores.skin + scores.body + scores.mind + scores.diet + scores.spirit + energyScoreNorm) / 6) * 100,
+  );
 
   const sleepMin = useMemo(() => {
     const logs = readLocal<Array<{ date: string; duration_min: number | null }>>('full-ritual-sleep', []);
@@ -136,7 +154,10 @@ export function Home() {
     ? `${Math.floor(sleepMin / 60)}h${String(sleepMin % 60).padStart(2, '0')}`
     : '—';
 
-  const energyLabel = dailyScore ? `${Math.round(scores.body * 10)}/10` : '—';
+  const energyValue = typeof energyFromCheckin === 'number'
+    ? energyFromCheckin
+    : dailyScore ? Math.round(scores.body * 10) : null;
+  const energyLabel = energyValue !== null ? `${energyValue}/10` : '—';
 
   const dailyInsight = useMemo(
     () => buildDailyInsight(sleepMin, cycle, latestInsight),
@@ -257,46 +278,31 @@ export function Home() {
 
       <section className="card presence-card">
         <span className="eyebrow" style={{ alignSelf: 'flex-start' }}>presença · {shortDateLabel}</span>
-        <div className="presence-ring">
-          <MultiRing
-            size={210}
-            stroke={10}
-            gap={4}
-            values={(['skin', 'body', 'mind', 'diet', 'spirit'] as DimensionKey[]).map((key) => ({
-              value: scores[key],
-              color: DIMENSIONS[key].color,
-            }))}
-          />
-          <div className="presence-center">
-            <div className="presence-medallion">
-              <strong>{totalScore}</strong>
-              <span>presença</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="dimension-legend">
-          {(Object.keys(DIMENSIONS) as DimensionKey[]).map((key) => (
-            <button key={key} onClick={() => openDimension(key)}>
-              <span style={{ background: DIMENSIONS[key].color }} aria-hidden />
-              <small>{DIMENSIONS[key].label}</small>
-            </button>
-          ))}
-        </div>
+        <PresenceFlower
+          petals={[
+            { key: 'skin', label: 'Pele', color: '#E07A55', value: scores.skin, onClick: () => openDimension('skin') },
+            { key: 'body', label: 'Corpo', color: '#D9501A', value: scores.body, onClick: () => openDimension('body') },
+            { key: 'energy', label: 'Energia', color: '#E8A23B', value: energyScoreNorm, onClick: () => goTo('energy') },
+            { key: 'diet', label: 'Dieta', color: '#5B7A38', value: scores.diet, onClick: () => openDimension('diet') },
+            { key: 'spirit', label: 'Espírito', color: '#6B2856', value: scores.spirit, onClick: () => openDimension('spirit') },
+            { key: 'mind', label: 'Mente', color: '#0E5B6E', value: scores.mind, onClick: () => openDimension('mind') },
+          ]}
+          totalScore={totalScore}
+        />
       </section>
 
       <section className="card card--ai insight-review-card">
         <span className="eyebrow">review · {shortDateLabel}</span>
         <div className="insight-number-grid">
-          <button onClick={() => goTo('sleep')}>
+          <button onClick={() => goTo('energy')}>
             <strong>{sleepLabel}</strong>
             <span>sono</span>
           </button>
-          <button onClick={() => goTo('evolution')}>
+          <button onClick={() => goTo('energy')}>
             <strong>dia {cycle.day}</strong>
             <span>{phaseLabel(cycle.phase)}</span>
           </button>
-          <button onClick={() => goTo('body')}>
+          <button onClick={() => goTo('energy')}>
             <strong>{energyLabel}</strong>
             <span>energia</span>
           </button>
@@ -325,6 +331,158 @@ export function Home() {
         <span className="eyebrow">IA · conversa</span>
         <strong>abrir chat com presença</strong>
       </button>
+    </div>
+  );
+}
+
+const PETAL_DEEP: Record<string, string> = {
+  '#E07A55': '#B8472A',
+  '#D9501A': '#8E2E08',
+  '#E8A23B': '#A6661A',
+  '#5B7A38': '#2E4419',
+  '#6B2856': '#3A0F2D',
+  '#0E5B6E': '#062F3B',
+};
+
+type Petal = {
+  key: string;
+  label: string;
+  color: string;
+  value: number;
+  onClick: () => void;
+};
+
+function PresenceFlower({ petals, totalScore }: { petals: Petal[]; totalScore: number }) {
+  const size = 260;
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = 110;
+  const innerR = 40;
+  const ink = 'rgba(74,44,34,0.32)';
+  const inkSoft = 'rgba(74,44,34,0.14)';
+
+  const pointAt = (i: number, r: number) => {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r] as const;
+  };
+
+  const hexPath = (r: number) =>
+    Array.from({ length: 6 })
+      .map((_, i) => {
+        const [x, y] = pointAt(i, r);
+        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(' ') + ' Z';
+
+  return (
+    <div className="presence-sigil">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="presence-sigil__svg"
+        role="img"
+        aria-label={`presença ${totalScore} de 100`}
+      >
+        {/* outer + mid hex frames */}
+        <path d={hexPath(outerR)} fill="none" stroke={ink} strokeWidth={0.8} />
+        <path d={hexPath(outerR * 0.66)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
+        <path d={hexPath(outerR * 0.33)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
+
+        {/* full spokes (hairline) */}
+        {petals.map((p, i) => {
+          const [x, y] = pointAt(i, outerR);
+          return (
+            <line
+              key={`spoke-${p.key}`}
+              x1={cx}
+              y1={cy}
+              x2={x}
+              y2={y}
+              stroke={inkSoft}
+              strokeWidth={0.6}
+            />
+          );
+        })}
+
+        {/* score bars + dimension tick */}
+        {petals.map((p, i) => {
+          const v = Math.max(0, Math.min(1, p.value));
+          const reach = innerR + (outerR - innerR) * v;
+          const [bx, by] = pointAt(i, reach);
+          const [ix, iy] = pointAt(i, innerR);
+          const [ox, oy] = pointAt(i, outerR);
+          return (
+            <g key={p.key} className="presence-sigil__spoke" onClick={p.onClick} style={{ cursor: 'pointer' }}>
+              {/* invisible wide hit area */}
+              <line x1={ix} y1={iy} x2={ox} y2={oy} stroke="transparent" strokeWidth={18} />
+              {/* filled bar */}
+              <line
+                x1={ix}
+                y1={iy}
+                x2={bx}
+                y2={by}
+                stroke={p.color}
+                strokeWidth={3}
+                strokeLinecap="round"
+                style={{
+                  transition: 'all 700ms cubic-bezier(.16,.84,.4,1)',
+                  filter: `drop-shadow(0 0 4px ${p.color}55)`,
+                }}
+              />
+              {/* tip node */}
+              <circle cx={bx} cy={by} r={3.4} fill={p.color} />
+              {/* vertex glyph */}
+              <circle cx={ox} cy={oy} r={2} fill={ink} />
+            </g>
+          );
+        })}
+
+        {/* center disc */}
+        <circle cx={cx} cy={cy} r={innerR + 2} fill="var(--paper, #FBF6EB)" />
+        <circle cx={cx} cy={cy} r={innerR - 2} fill="var(--paper, #FBF6EB)" stroke={ink} strokeWidth={0.8} />
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="presence-sigil__number"
+        >
+          {totalScore}
+        </text>
+        <text
+          x={cx}
+          y={cy + 14}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="presence-sigil__sublabel"
+        >
+          presença
+        </text>
+      </svg>
+
+      <div className="presence-sigil__legend">
+        {petals.map((p) => {
+          const v = Math.max(0, Math.min(1, p.value));
+          const deep = PETAL_DEEP[p.color] ?? p.color;
+          return (
+            <button key={p.key} onClick={p.onClick} className="presence-sigil__chip">
+              <small>{p.label}</small>
+              <em>{Math.round(v * 10)}</em>
+              <span className="presence-sigil__bar" aria-hidden>
+                <span
+                  className="presence-sigil__bar-fill"
+                  style={{
+                    width: `${v * 100}%`,
+                    background: `linear-gradient(180deg, ${p.color} 0%, ${deep} 100%)`,
+                    boxShadow: `0 1px 0 rgba(255,255,255,0.4) inset, 0 -1px 1px ${deep}66 inset, 0 1px 3px ${deep}55`,
+                  }}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

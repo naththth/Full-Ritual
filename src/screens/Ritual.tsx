@@ -1,24 +1,10 @@
 import { useState } from 'react';
-import { PresenceSlider } from '../components/PresenceSlider';
 import { ROUTINES, getRoutineTasks, type RoutineArea, type RoutinePeriod } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useLocalState } from '../lib/useLocalState';
 import { useApp } from '../store/useStore';
 import { hasSupabase, supabase } from '../lib/supabase';
-
-const SIGNAL_TAGS = [
-  { id: 'cabeça pesada', label: 'cabeça pesada', icon: '◜' },
-  { id: 'fome', label: 'fome', icon: '◒' },
-  { id: 'tensão nos ombros', label: 'tensão nos ombros', icon: '⌁' },
-  { id: 'ansiedade leve', label: 'ansiedade leve', icon: '◇' },
-  { id: 'sede', label: 'sede', icon: '◍' },
-  { id: 'cansaço', label: 'cansaço', icon: '◡' },
-  { id: 'frio', label: 'frio', icon: '∴' },
-  { id: 'calor', label: 'calor', icon: '☉' },
-  { id: 'inquietação', label: 'inquietação', icon: '∿' },
-  { id: 'paz', label: 'paz', icon: '○' },
-];
 
 type RoutineChecks = Record<string, boolean>;
 
@@ -32,11 +18,6 @@ export function Ritual() {
   const [openAreas, setOpenAreas] = useState<Set<RoutineArea>>(new Set());
   const [checks, setChecks] = useLocalState<RoutineChecks>(`full-ritual-routine-checks-${selectedDate}`, {});
   const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(`full-ritual-skin-photo-${selectedDate}`, null);
-  const [energy, setEnergy] = useState(6);
-  const [calm, setCalm] = useState(5);
-  const [skinState, setSkinState] = useState(7);
-  const [bodyState, setBodyState] = useState(6);
-  const [signals, setSignals] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -54,18 +35,6 @@ export function Ritual() {
     setChecks((current) => ({ ...current, [key]: !current[key] }));
   };
 
-  const toggleArea = (area: RoutineArea) => {
-    setOpenAreas((prev) => {
-      const next = new Set(prev);
-      if (next.has(area)) {
-        next.delete(area);
-      } else {
-        next.add(area);
-      }
-      return next;
-    });
-  };
-
   const markArea = (area: RoutineArea) => {
     setChecks((current) => {
       const next = { ...current };
@@ -74,12 +43,6 @@ export function Ritual() {
       });
       return next;
     });
-  };
-
-  const toggleSignal = (signal: string) => {
-    setSignals((prev) =>
-      prev.includes(signal) ? prev.filter((item) => item !== signal) : [...prev, signal]
-    );
   };
 
   const handleSkinPhoto = async (file: File) => {
@@ -102,30 +65,18 @@ export function Ritual() {
     setSaving(true);
     try {
       if (hasSupabase && userId) {
-        const { error: checkinError } = await supabase.from('checkins').insert({
-          user_id: userId,
-          date: selectedDate,
-          energy,
-          calm,
-          skin_state: skinState,
-          body_state: bodyState,
-          signals,
-          note: note || null,
-        });
-        if (checkinError) throw checkinError;
-
         if (skinPhoto) {
           const { error: skinError } = await supabase.from('skincare_logs').insert({
             user_id: userId,
             date: selectedDate,
             time_of_day: period === 'day' ? 'manha' : 'noite',
-            skin_signal: note || signals.join(', ') || null,
+            skin_signal: note || null,
             photo_url: skinPhoto,
           });
           if (skinError) throw skinError;
         }
       }
-      showToast('ritual guardado.');
+      showToast('rotina de pele guardada.');
       goTo('home');
     } catch (error) {
       showToast('não foi possível guardar agora.');
@@ -139,13 +90,13 @@ export function Ritual() {
     <div className="screen stack-md ritual-screen">
       <header className={`ritual-hero ritual-hero--${period}`}>
         <div className="row-between">
-          <span className="eyebrow">rosto · corpo · aromas · {dateLabel}</span>
+          <span className="eyebrow">pele · aromas · {dateLabel}</span>
           <span className="ritual-score">{done}/{total}</span>
         </div>
         <h1 className="t-display-lg">
           {period === 'day' ? 'Acordar a pele sem pressa.' : 'Desacelerar antes de dormir.'}
         </h1>
-        <p>{period === 'day' ? 'Ritual do dia: presença antes de performance.' : 'Ritual da noite: o corpo entende que acabou.'}</p>
+        <p>{period === 'day' ? 'Rosto, corpo e aromas sem misturar com check-in corporal.' : 'Cuidado externo para a pele entender que o dia acabou.'}</p>
         <div className="segmented segmented--light">
           <button className={period === 'day' ? 'segmented--active' : ''} onClick={() => setPeriod('day')}>dia</button>
           <button className={period === 'night' ? 'segmented--active' : ''} onClick={() => setPeriod('night')}>noite</button>
@@ -158,16 +109,32 @@ export function Ritual() {
           Boolean(checks[`${period}:${area}:${index}`])
         ).length;
         return (
-          <section key={area} className="card routine-accordion">
-            <button className="accordion-trigger" onClick={() => toggleArea(area)}>
-              <div className="accordion-trigger-left">
+          <details
+            key={area}
+            className="dimension-panel dimension-panel--skin card stack routine-accordion"
+            open={isOpen}
+            onToggle={(event) => {
+              const nextOpen = event.currentTarget.open;
+              setOpenAreas((prev) => {
+                const next = new Set(prev);
+                if (nextOpen) {
+                  next.add(area);
+                } else {
+                  next.delete(area);
+                }
+                return next;
+              });
+            }}
+            style={{ '--panel-dim': 'var(--skin)' } as React.CSSProperties}
+          >
+            <summary>
+              <span>
                 <span className="eyebrow">{areaLabel(area)}</span>
-                <span className="accordion-count">{areaChecked}/{routine[area].length}</span>
-              </div>
-              <span className={`accordion-chevron${isOpen ? ' accordion-chevron--open' : ''}`}>›</span>
-            </button>
+                <strong>{areaChecked}/{routine[area].length}</strong>
+              </span>
+            </summary>
             {isOpen && (
-              <div className="accordion-body stack">
+              <div className="dimension-panel-body stack">
                 <button className="chip" onClick={() => markArea(area)}>marcar tudo</button>
                 <div className="task-list">
                   {routine[area].map((task, index) => {
@@ -190,37 +157,9 @@ export function Ritual() {
                 </div>
               </div>
             )}
-          </section>
+          </details>
         );
       })}
-
-      <section className="card stack">
-        <span className="eyebrow">check-in · energia</span>
-        <PresenceSlider label="energia" value={energy} onChange={setEnergy} color="var(--body)" />
-        <div className="divider" />
-        <PresenceSlider label="calma" value={calm} onChange={setCalm} color="var(--mind)" />
-        <div className="divider" />
-        <PresenceSlider label="pele" value={skinState} onChange={setSkinState} color="var(--skin)" />
-        <div className="divider" />
-        <PresenceSlider label="corpo" value={bodyState} onChange={setBodyState} color="var(--diet)" />
-      </section>
-
-      <section className="stack">
-        <span className="eyebrow">sinais do corpo</span>
-        <div className="signal-grid">
-          {SIGNAL_TAGS.map((signal) => (
-            <button
-              key={signal.id}
-              className={`signal-button ${signals.includes(signal.id) ? 'signal-button--active' : ''}`}
-              onClick={() => toggleSignal(signal.id)}
-              aria-pressed={signals.includes(signal.id)}
-            >
-              <span className="signal-icon" aria-hidden>{signal.icon}</span>
-              <span>{signal.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
 
       <section className="card stack ritual-photo-card">
         <div className="photo-card-head">
@@ -255,7 +194,7 @@ export function Ritual() {
       </section>
 
       <button className="btn btn--primary btn--full" onClick={save} disabled={saving}>
-        {saving ? 'guardando…' : 'guardar este ritual'}
+        {saving ? 'guardando…' : 'guardar rotina de pele'}
       </button>
     </div>
   );

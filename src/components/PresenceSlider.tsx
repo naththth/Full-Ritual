@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PresenceSliderProps {
   label: string;
@@ -24,6 +24,10 @@ export function PresenceSlider({
   const [v, setV] = useState(value);
   const pct = ((v - min) / (max - min)) * 100;
 
+  useEffect(() => {
+    setV(value);
+  }, [value]);
+
   return (
     <div style={{ padding: '12px 0' }}>
       <div className="row-between" style={{ marginBottom: 10 }}>
@@ -38,9 +42,10 @@ export function PresenceSlider({
           style={{
             position: 'absolute',
             left: 0, right: 0,
-            height: 2,
-            background: 'rgba(74,44,34,0.12)',
-            borderRadius: 1,
+            height: 6,
+            background: 'linear-gradient(180deg, rgba(74,44,34,0.14) 0%, rgba(74,44,34,0.04) 100%)',
+            borderRadius: 999,
+            boxShadow: 'inset 0 1px 2px rgba(74,44,34,0.18), inset 0 -1px 0 rgba(255,255,255,0.5)',
           }}
         />
         <div
@@ -48,9 +53,10 @@ export function PresenceSlider({
             position: 'absolute',
             left: 0,
             width: `${pct}%`,
-            height: 2,
-            background: color,
-            borderRadius: 1,
+            height: 6,
+            background: `linear-gradient(180deg, ${color} 0%, ${color} 60%, rgba(0,0,0,0.18) 100%)`,
+            borderRadius: 999,
+            boxShadow: `0 1px 0 rgba(255,255,255,0.4) inset, 0 1px 4px ${color}55`,
             transition: 'width 180ms cubic-bezier(.4,0,.2,1)',
           }}
         />
@@ -85,9 +91,10 @@ export function PresenceSlider({
             color: 'var(--ivory)',
             display: 'grid',
             placeItems: 'center',
-            fontFamily: 'var(--mono)',
-            fontSize: 12,
-            fontWeight: 500,
+            fontFamily: 'var(--display)',
+            fontSize: 14,
+            fontWeight: 600,
+            letterSpacing: '-0.01em',
             boxShadow: '0 4px 12px rgba(74,44,34,0.18)',
             transition: 'left 180ms cubic-bezier(.4,0,.2,1)',
             pointerEvents: 'none',

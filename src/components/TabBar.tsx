@@ -1,9 +1,13 @@
 import { useApp } from '../store/useStore';
+import { Glyph } from './Glyph';
+
+type TabKey = 'home' | 'energy' | 'ritual' | 'body' | 'mind' | 'diet' | 'spirit' | 'insight';
 
 type Tab = {
-  key: 'home' | 'ritual' | 'body' | 'mind' | 'diet' | 'spirit' | 'insight';
+  key: TabKey;
   label: string;
-  icon: string;
+  glyph: Parameters<typeof Glyph>[0]['kind'];
+  dim?: string;
 };
 
 export function TabBar() {
@@ -12,13 +16,14 @@ export function TabBar() {
   const goTo = useApp((s) => s.goTo);
 
   const tabs: Tab[] = [
-    { key: 'home', label: 'Hoje', icon: '○' },
-    { key: 'ritual', label: 'Pele', icon: '◐' },
-    { key: 'body', label: 'Corpo', icon: '◑' },
-    { key: 'mind', label: 'Mente', icon: '○' },
-    { key: 'diet', label: 'Dieta', icon: '◍' },
-    { key: 'spirit', label: 'Espírito', icon: '✧' },
-    { key: 'insight', label: 'Insight', icon: '✦' },
+    { key: 'home', label: 'Hoje', glyph: 'mandala' },
+    { key: 'energy', label: 'Energia', glyph: 'spark', dim: 'var(--gold)' },
+    { key: 'ritual', label: 'Pele', glyph: 'sun', dim: 'var(--skin)' },
+    { key: 'body', label: 'Corpo', glyph: 'flame', dim: 'var(--body)' },
+    { key: 'mind', label: 'Mente', glyph: 'moon', dim: 'var(--mind)' },
+    { key: 'diet', label: 'Dieta', glyph: 'leaf', dim: 'var(--diet)' },
+    { key: 'spirit', label: 'Espírito', glyph: 'lotus', dim: 'var(--spirit)' },
+    { key: 'insight', label: 'Insight', glyph: 'orbit' },
   ];
 
   return (
@@ -38,9 +43,13 @@ export function TabBar() {
             onClick={() => goTo(tab.key)}
             aria-current={active ? 'page' : undefined}
             aria-label={tab.label}
+            style={active && tab.dim ? ({ ['--tab-accent' as never]: tab.dim } as React.CSSProperties) : undefined}
           >
-            <span className="tab__icon" aria-hidden>{tab.icon}</span>
+            <span className="tab__icon" aria-hidden style={tab.dim && active ? { color: tab.dim } : undefined}>
+              <Glyph kind={tab.glyph} size={20} strokeWidth={1.7} filled={active} />
+            </span>
             <span className="tab__label">{tab.label}</span>
+            {active && <span className="tab__dot" aria-hidden />}
           </button>
         );
       })}

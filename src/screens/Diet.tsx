@@ -120,9 +120,9 @@ export function Diet() {
         </p>
       </header>
 
-      <section className="card card--dim stack" style={{ '--dim': 'var(--diet)' } as React.CSSProperties}>
+      <section className="card diet-water-card stack" style={{ '--dim': 'var(--diet)' } as React.CSSProperties}>
         <span className="eyebrow">água e recuperação</span>
-        <div className="t-display-md" style={{ color: 'var(--ivory)' }}>
+        <div className="t-display-md">
           {(diet.water * 0.5).toFixed(1).replace('.', ',')}L de {String(target).replace('.', ',')}L
         </div>
         <div className="water-grid">
@@ -145,64 +145,77 @@ export function Diet() {
         const done = items.filter((_, index) => state.checks[index]).length;
 
         return (
-          <section key={meal.id} className="meal-card">
-            <div className="row-between" style={{ alignItems: 'flex-start' }}>
-              <div>
-                <h2 className="meal-title">{meal.title}</h2>
-                <div className="t-body-sm muted">{meal.time}</div>
+          <details
+            key={meal.id}
+            className="dimension-panel dimension-panel--diet card stack meal-panel"
+            style={{ '--panel-dim': 'var(--diet)' } as React.CSSProperties}
+          >
+            <summary>
+              <span>
+                <span className="eyebrow">{meal.title}</span>
+                <strong>{done ? `${done} escolhidos` : meal.time}</strong>
+              </span>
+            </summary>
+
+            <div className="dimension-panel-body">
+              <div className="row-between" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <h2 className="meal-title">{meal.title}</h2>
+                  <div className="t-body-sm muted">{meal.time}</div>
+                </div>
+                <span className="meal-pill">{Math.round((done / items.length) * 100) || 0}%</span>
               </div>
-              <span className="meal-pill">{Math.round((done / items.length) * 100) || 0}%</span>
-            </div>
 
-            <div className="chip-row">
-              {Object.keys(meal.variants).map((variant) => (
-                <button
-                  key={variant}
-                  className={`chip ${state.variant === variant ? 'chip--active' : ''}`}
-                  onClick={() => updateMeal(meal.id, { variant, checks: {} })}
-                >
-                  {variant === recommendedVariant ? 'sugestão' : variant === 'principal' ? 'principal' : variant.replace('sub', 'sub ')}
+              <div className="chip-row">
+                {Object.keys(meal.variants).map((variant) => (
+                  <button
+                    key={variant}
+                    className={`chip ${state.variant === variant ? 'chip--active' : ''}`}
+                    onClick={() => updateMeal(meal.id, { variant, checks: {} })}
+                  >
+                    {variant === recommendedVariant ? 'sugestão' : variant === 'principal' ? 'principal' : variant.replace('sub', 'sub ')}
+                  </button>
+                ))}
+              </div>
+
+              <div className="task-list">
+                {items.map((item, index) => (
+                  <button
+                    key={`${item.title}-${index}`}
+                    className={`task-row ${state.checks[index] ? 'task-row--done' : ''}`}
+                    onClick={() => toggleItem(meal.id, index)}
+                  >
+                    <span className="task-check">{state.checks[index] ? '✓' : ''}</span>
+                    <span>
+                      <strong>{item.title}</strong>
+                      {item.note && <small>{item.note}</small>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="inline-actions">
+                <label className="file-button">
+                  foto da refeição
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleMealPhoto(meal.id, file);
+                    }}
+                  />
+                </label>
+                <button className="btn btn--secondary btn--sm" onClick={() => markMeal(meal.id, items.length)}>
+                  marcar tudo
                 </button>
-              ))}
-            </div>
+              </div>
 
-            <div className="task-list">
-              {items.map((item, index) => (
-                <button
-                  key={`${item.title}-${index}`}
-                  className={`task-row ${state.checks[index] ? 'task-row--done' : ''}`}
-                  onClick={() => toggleItem(meal.id, index)}
-                >
-                  <span className="task-check">{state.checks[index] ? '✓' : ''}</span>
-                  <span>
-                    <strong>{item.title}</strong>
-                    {item.note && <small>{item.note}</small>}
-                  </span>
-                </button>
-              ))}
+              {state.photoUrl && (
+                <img className="photo-preview" src={state.photoUrl} alt={`Foto de ${meal.title}`} />
+              )}
             </div>
-
-            <div className="inline-actions">
-              <label className="file-button">
-                foto da refeição
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleMealPhoto(meal.id, file);
-                  }}
-                />
-              </label>
-              <button className="btn btn--secondary btn--sm" onClick={() => markMeal(meal.id, items.length)}>
-                marcar tudo
-              </button>
-            </div>
-
-            {state.photoUrl && (
-              <img className="photo-preview" src={state.photoUrl} alt={`Foto de ${meal.title}`} />
-            )}
-          </section>
+          </details>
         );
       })}
 

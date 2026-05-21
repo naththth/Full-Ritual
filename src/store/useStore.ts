@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Profile, DimensionKey } from '../types';
 import { isoToday } from '../lib/dates';
+import { safeStringStorage } from '../lib/storage';
 
 type Screen =
   | 'home'
+  | 'energy'
   | 'ritual'
   | 'body'
   | 'mind'
@@ -15,7 +17,6 @@ type Screen =
   | 'profile'
   | 'products'
   | 'library'
-  | 'sleep'
   | 'evolution'
   | 'chat';
 
@@ -83,6 +84,16 @@ export const useApp = create<AppState>()(
         setTimeout(() => set({ toast: null }), 2400);
       },
     }),
-    { name: 'full-ritual-session' }
+    {
+      name: 'full-ritual-session',
+      storage: createJSONStorage(() => safeStringStorage),
+      version: 1,
+      migrate: (persistedState) => {
+        const state = persistedState as AppState;
+        return (state?.screen as string) === 'sleep'
+          ? { ...state, screen: 'energy' }
+          : state;
+      },
+    }
   )
 );

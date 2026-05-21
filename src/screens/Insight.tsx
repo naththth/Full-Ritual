@@ -43,6 +43,16 @@ export function Insight() {
   const avgSleep = sleepLogs.length
     ? Math.round(sleepLogs.reduce((sum, log) => sum + (log.duration_min ?? 0), 0) / sleepLogs.length)
     : 372;
+  const idealSleepMin = 440;
+  const sleepDelta = avgSleep - idealSleepMin;
+  const sleepStatus = sleepDelta >= 15
+    ? 'Acima do seu ritmo.'
+    : sleepDelta <= -15
+      ? 'Abaixo do seu ritmo.'
+      : 'Dentro do seu ritmo.';
+  const sleepDeltaLabel = Math.abs(sleepDelta) < 15
+    ? 'dentro da faixa da média ideal'
+    : `${minutesToSleepLabel(Math.abs(sleepDelta))} ${sleepDelta > 0 ? 'acima' : 'abaixo'} da média ideal`;
 
   return (
     <div className="screen stack-md">
@@ -92,14 +102,14 @@ export function Insight() {
             </div>
           </Ring>
           <div style={{ flex: 1 }}>
-            <div className="t-display-md">Abaixo do seu ritmo.</div>
+            <div className="t-display-md">{sleepStatus}</div>
             <p className="t-body-sm muted" style={{ marginTop: 6 }}>
-              média ideal: 7h20 · variação de horário em observação
+              média ideal: {minutesToSleepLabel(idealSleepMin)} · {sleepDeltaLabel}
             </p>
           </div>
         </div>
-        <button className="btn btn--secondary btn--full" onClick={() => goTo('sleep')}>
-          ver detalhe do sono
+        <button className="btn btn--secondary btn--full" onClick={() => goTo('energy')}>
+          registrar sono em energia
         </button>
       </section>
 

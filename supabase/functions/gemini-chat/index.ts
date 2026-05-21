@@ -86,18 +86,23 @@ Deno.serve(async (req: Request) => {
     const geminiUrl =
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: 'user', parts: [{ text: message }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 600,
+          maxOutputTokens: 1400,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
-    });
+    }).finally(() => clearTimeout(timeout));
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
@@ -106,8 +111,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const geminiData = await geminiRes.json();
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
-      ?? 'Sem resposta no momento.';
+    const candidate = geminiData?.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const reply = extractText(candidate) || 'Sem resposta no momento.';
+
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn('Gemini chat response reached max output tokens.');
+    }
 
     // 5. Salva a interação para histórico (opt-in via profile.ai_enabled)
     if (profile?.ai_enabled) {
@@ -123,6 +133,10 @@ Deno.serve(async (req: Request) => {
 
     return json({ reply }, 200);
   } catch (err) {
+    if ((err as Error)?.name === 'AbortError') {
+      return json({ error: 'tempo esgotado ao consultar a IA' }, 504);
+    }
+
     console.error(err);
     return json({ error: 'erro interno' }, 500);
   }
@@ -133,6 +147,17 @@ function json(body: unknown, status: number) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+function extractText(candidate: any): string {
+  const parts = candidate?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+
+  return parts
+    .map((part) => typeof part?.text === 'string' ? part.text : '')
+    .filter(Boolean)
+    .join('\n')
+    .trim();
 }
 
 function buildContextSummary({ profile, checkins, sleep, insights, extra }: {

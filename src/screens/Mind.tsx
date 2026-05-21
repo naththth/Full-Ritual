@@ -49,6 +49,16 @@ interface ResourceSuggestion {
   linkLabel: string;
 }
 
+interface MindSuggestionItem {
+  kind: string;
+  short: string;
+  label: string;
+  value: string;
+  instruction?: string;
+  href?: string;
+  practice?: MindType;
+}
+
 const initialMind: MindState = {
   selectedPractices: ['foco'],
   activePractice: 'foco',
@@ -74,6 +84,24 @@ const PRACTICES: { value: MindType; label: string }[] = [
 ];
 
 const FEELINGS = ['clara', 'calma', 'dispersa', 'ansiosa', 'cansada', 'leve'];
+
+const DURATION_OPTIONS: Record<MindType, string[]> = {
+  foco: ['15', '25', '50'],
+  leitura: ['10', '15', '30'],
+  som: ['15', '20', '40'],
+  meditacao: ['5', '10', '15'],
+  pausa: ['1', '3', '5'],
+};
+
+const PAGES_READ_OPTIONS = ['5', '10', '15', '20', '30'];
+
+const NOTE_PRESETS: Record<MindType, string[]> = {
+  foco: ['sem troca de aba', 'comecei com resistência', 'clareou depois de alguns minutos', 'preciso quebrar menor'],
+  leitura: ['li com calma', 'avancei pouco mas avancei', 'quero continuar esse trecho', 'difícil manter atenção'],
+  som: ['ajudou o foco', 'ficou invasivo', 'bom para começo do bloco', 'melhor em volume baixo'],
+  meditacao: ['mente acelerada', 'voltei para a respiração', 'corpo relaxou', 'sono apareceu'],
+  pausa: ['usei antes de responder', 'baixou a urgência', 'preciso repetir mais cedo', 'foi suficiente'],
+};
 
 const MENTAL_MODELS = [
   ['Inversão', 'https://fs.blog/inversion/'],
@@ -204,6 +232,7 @@ export function Mind() {
     () => buildResourceSuggestions(dayIndex, profile?.content_prefs ?? []),
     [dayIndex, profile?.content_prefs],
   );
+  const selectedResourcesCount = resources.filter((resource) => mind.resourceChecks[resource.id]).length;
 
   const update = <K extends keyof MindState>(key: K, value: MindState[K]) => {
     setMind((current) => ({ ...current, [key]: value }));
@@ -264,6 +293,7 @@ export function Mind() {
           `Preferências de conteúdo: ${(profile?.content_prefs ?? []).join(', ') || 'sem preferência definida'}.`,
           `Preferências musicais: ${(profile?.music_prefs ?? []).join(', ') || 'sem preferência definida'}.`,
           'Responda em português, em 4 bullets curtos: foco, som, pausa e repertório.',
+          'Cada bullet deve ter apenas um nome e uma frase curta. Não explique o passo a passo.',
         ].join('\n'),
         { focus_dimension: 'mind' },
       );
@@ -380,79 +410,116 @@ export function Mind() {
         </div>
       </section>
 
-      <section className="card stack">
+      <section className="card stack mind-day-suggestion">
         <div className="row-between">
-          <span className="eyebrow">sugestão IA</span>
+          <span className="eyebrow">sugestão do dia</span>
           <button className="chip" onClick={refreshAiSuggestions} disabled={aiLoading}>
             {aiLoading ? 'gerando' : 'regenerar'}
           </button>
         </div>
-        <p className="mind-ai-note">
-          {mind.aiNote || localAiSummary(suggestions, resources)}
-        </p>
-      </section>
+        <div className="mind-suggestion-list">
+          {(mind.aiNote ? parseAiSuggestions(mind.aiNote, suggestions, resources) : localSuggestionItems(suggestions, resources)).map((item) => {
+            const content = (
+              <>
+                <span className="mind-suggestion-mark" aria-hidden="true">{item.short}</span>
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.value}</small>
+                  {item.instruction && <em>{item.instruction}</em>}
+                </span>
+                <i aria-hidden="true">›</i>
+              </>
+            );
+            const className = `mind-suggestion-item mind-suggestion-item--${item.kind}`;
 
-      <section className="card stack">
-        <span className="eyebrow">prática</span>
-        <div className="mind-type-grid">
-          {PRACTICES.map((practice) => {
-            const suggestion = suggestions[practice.value];
-            const selected = selectedPractices.includes(practice.value);
-            return (
+            return item.href ? (
+              <a className={className} href={item.href} target="_blank" rel="noreferrer" key={`${item.kind}-${item.label}`}>
+                {content}
+              </a>
+            ) : (
               <button
-                key={practice.value}
-                className={`mind-type ${selected ? 'mind-type--active' : ''}`}
-                onClick={() => togglePractice(practice.value)}
-                aria-pressed={selected}
+                className={className}
+                key={`${item.kind}-${item.label}`}
+                onClick={() => {
+                  if (item.practice && !selectedPractices.includes(item.practice)) togglePractice(item.practice);
+                  if (item.practice) update('activePractice', item.practice);
+                }}
               >
-                <strong>{practice.label}</strong>
-                <span>{suggestion.detail}</span>
+                {content}
               </button>
             );
           })}
         </div>
+      </section>
 
-        {selectedPractices.length > 1 && (
-          <div className="practice-session-tabs" aria-label="Prática ativa">
-            {selectedPractices.map((type) => (
-              <button
-                key={type}
-                className={`practice-session-tab practice-session-tab--${type} ${activePractice === type ? 'practice-session-tab--active' : ''}`}
-                onClick={() => update('activePractice', type)}
-              >
-                {practiceLabel(type)}
-              </button>
-            ))}
+      <details className="mind-panel card stack" open>
+        <summary>
+          <span>
+            <span className="eyebrow">práticas</span>
+            <strong>{selectedPractices.length ? `${selectedPractices.length} escolhidas` : 'escolher práticas'}</strong>
+          </span>
+        </summary>
+
+        <div className="mind-panel-body">
+          <div className="mind-type-grid">
+            {PRACTICES.map((practice) => {
+              const suggestion = suggestions[practice.value];
+              const selected = selectedPractices.includes(practice.value);
+              return (
+                <button
+                  key={practice.value}
+                  className={`mind-type ${selected ? 'mind-type--active' : ''}`}
+                  onClick={() => togglePractice(practice.value)}
+                  aria-pressed={selected}
+                >
+                  <strong>{practice.label}</strong>
+                  <span>{suggestion.detail}</span>
+                </button>
+              );
+            })}
           </div>
-        )}
 
-        {selectedPractices.length === 0 && (
-          <p className="t-body-sm muted">Escolha uma prática para registrar mente de hoje.</p>
-        )}
+          {selectedPractices.length > 1 && (
+            <div className="practice-session-tabs" aria-label="Prática ativa">
+              {selectedPractices.map((type) => (
+                <button
+                  key={type}
+                  className={`practice-session-tab practice-session-tab--${type} ${activePractice === type ? 'practice-session-tab--active' : ''}`}
+                  onClick={() => update('activePractice', type)}
+                >
+                  {practiceLabel(type)}
+                </button>
+              ))}
+            </div>
+          )}
 
-        {selectedPractices.includes(activePractice) && ([activePractice] as MindType[]).map((type) => {
-          const suggestion = suggestions[type];
-          const log = { ...defaultPracticeLog(type), ...(mind.practiceLogs[type] ?? {}) };
-          const readingProgressValue = activeBook ? readingProgress(activeBook) : 0;
+          {selectedPractices.length === 0 && (
+            <p className="t-body-sm muted">Escolha uma prática para registrar mente de hoje.</p>
+          )}
 
-          return (
-            <div className="practice-detail" key={type}>
-              <div>
-                <span className="eyebrow">{practiceLabel(type)}</span>
-                {type !== 'som' && <h2>{type === 'leitura' ? 'Leitura de hoje' : suggestion.title}</h2>}
-                {type !== 'pausa' && type !== 'som' && (
-                  <p>
-                    {type === 'leitura' && activeBook
-                      ? 'Escolha um livro da Biblioteca e registre quantas páginas leu hoje.'
-                      : suggestion.action}
-                  </p>
-                )}
-                {suggestion.link && type !== 'som' && !(type === 'leitura' && activeBook) && (
-                  <a href={suggestion.link} target="_blank" rel="noreferrer">
-                    {suggestion.linkLabel ?? 'abrir'}
-                  </a>
-                )}
-              </div>
+          {selectedPractices.includes(activePractice) && ([activePractice] as MindType[]).map((type) => {
+            const suggestion = suggestions[type];
+            const log = { ...defaultPracticeLog(type), ...(mind.practiceLogs[type] ?? {}) };
+            const readingProgressValue = activeBook ? readingProgress(activeBook) : 0;
+
+            return (
+              <div className="practice-detail" key={type}>
+                <div>
+                  <span className="eyebrow">{practiceLabel(type)}</span>
+                  {type !== 'som' && <h2>{type === 'leitura' ? 'Leitura de hoje' : suggestion.title}</h2>}
+                  {type !== 'pausa' && type !== 'som' && (
+                    <p>
+                      {type === 'leitura' && activeBook
+                        ? 'Escolha um livro da Biblioteca e registre quantas páginas leu hoje.'
+                        : suggestion.action}
+                    </p>
+                  )}
+                  {suggestion.link && type !== 'som' && !(type === 'leitura' && activeBook) && (
+                    <a href={suggestion.link} target="_blank" rel="noreferrer">
+                      {suggestion.linkLabel ?? 'abrir'}
+                    </a>
+                  )}
+                </div>
 
               {type === 'som' && (
                 <div className="sound-suggestion-card">
@@ -502,12 +569,11 @@ export function Mind() {
                       </p>
                     </div>
                     <div className="reading-action-grid">
-                      <input
-                        className="field"
-                        inputMode="numeric"
-                        placeholder="páginas lidas hoje"
+                      <QuickChoices
+                        label="páginas hoje"
+                        options={PAGES_READ_OPTIONS}
                         value={mind.pagesRead}
-                        onChange={(event) => update('pagesRead', event.target.value)}
+                        onChange={(value) => update('pagesRead', value)}
                       />
                       <button className="chip" onClick={() => goTo('library')}>
                         abrir biblioteca
@@ -522,12 +588,11 @@ export function Mind() {
                       value={mind.bookTitle}
                       onChange={(event) => update('bookTitle', event.target.value)}
                     />
-                    <input
-                      className="field"
-                      inputMode="numeric"
-                      placeholder="páginas lidas hoje"
+                    <QuickChoices
+                      label="páginas hoje"
+                      options={PAGES_READ_OPTIONS}
                       value={mind.currentPage}
-                      onChange={(event) => update('currentPage', event.target.value)}
+                      onChange={(value) => update('currentPage', value)}
                     />
                     <button className="chip" onClick={() => goTo('library')}>
                       cadastrar livro
@@ -539,16 +604,13 @@ export function Mind() {
               {type !== 'pausa' && type !== 'som' && (
                 <>
                   <div className="practice-log-grid">
-                    <label className="compact-field">
-                      <span>duração</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        value={log.duration}
-                        onChange={(event) => updatePracticeLog(type, { duration: event.target.value })}
-                      />
-                    </label>
+                    <QuickChoices
+                      label="duração"
+                      options={DURATION_OPTIONS[type]}
+                      value={log.duration}
+                      suffix="min"
+                      onChange={(value) => updatePracticeLog(type, { duration: value })}
+                    />
                     <label className="compact-field">
                       <span>como me senti</span>
                       <select
@@ -561,48 +623,65 @@ export function Mind() {
                       </select>
                     </label>
                   </div>
-                  <textarea
-                    className="field"
-                    rows={2}
-                    placeholder="observação dessa prática..."
-                    value={log.notes}
-                    onChange={(event) => updatePracticeLog(type, { notes: event.target.value })}
-                  />
+                  <label className="compact-field">
+                    <span>observação</span>
+                    <select
+                      value={log.notes}
+                      onChange={(event) => updatePracticeLog(type, { notes: event.target.value })}
+                    >
+                      <option value="">sem observação</option>
+                      {NOTE_PRESETS[type].map((note) => (
+                        <option key={note} value={note}>{note}</option>
+                      ))}
+                    </select>
+                  </label>
                 </>
               )}
-            </div>
-          );
-        })}
-      </section>
-
-      <section className="card stack">
-        <span className="eyebrow">repertório</span>
-        <div className="resource-list">
-          {resources.map((resource) => (
-            <article
-              key={resource.id}
-              className={`resource-row ${mind.resourceChecks[resource.id] ? 'resource-row--active' : ''}`}
-            >
-              <div className="resource-row-main">
-                <button
-                  className="resource-check"
-                  onClick={() => toggleResource(resource.id)}
-                  aria-pressed={Boolean(mind.resourceChecks[resource.id])}
-                  aria-label={`marcar ${resource.title}`}
-                >
-                  <span className="task-check">{mind.resourceChecks[resource.id] ? '✓' : ''}</span>
-                </button>
-                <button className="resource-content" onClick={() => toggleResource(resource.id)}>
-                  <strong>{resource.title}</strong>
-                  <small>{resource.subtitle}</small>
-                  <em>{resource.detail}</em>
-                </button>
               </div>
-              <a href={resource.link} target="_blank" rel="noreferrer">{resource.linkLabel}</a>
-            </article>
-          ))}
+            );
+          })}
         </div>
-      </section>
+      </details>
+
+      <details className="mind-panel card stack">
+        <summary>
+          <span>
+            <span className="eyebrow">repertório</span>
+            <strong>
+              {selectedResourcesCount
+                ? `${selectedResourcesCount} selecionados`
+                : 'sugestões do dia'}
+            </strong>
+          </span>
+        </summary>
+        <div className="mind-panel-body">
+          <div className="resource-list">
+            {resources.map((resource) => (
+              <article
+                key={resource.id}
+                className={`resource-row ${mind.resourceChecks[resource.id] ? 'resource-row--active' : ''}`}
+              >
+                <div className="resource-row-main">
+                  <button
+                    className="resource-check"
+                    onClick={() => toggleResource(resource.id)}
+                    aria-pressed={Boolean(mind.resourceChecks[resource.id])}
+                    aria-label={`marcar ${resource.title}`}
+                  >
+                    <span className="task-check">{mind.resourceChecks[resource.id] ? '✓' : ''}</span>
+                  </button>
+                  <button className="resource-content" onClick={() => toggleResource(resource.id)}>
+                    <strong>{resource.title}</strong>
+                    <small>{resource.subtitle}</small>
+                    <em>{resource.detail}</em>
+                  </button>
+                </div>
+                <a href={resource.link} target="_blank" rel="noreferrer">{resource.linkLabel}</a>
+              </article>
+            ))}
+          </div>
+        </div>
+      </details>
 
       <button className="btn btn--primary btn--full" onClick={save} disabled={saving}>
         {saving ? 'guardando…' : `guardar mente de ${dateLabel}`}
@@ -620,11 +699,6 @@ function BookPicker({
   activeBook: ReadingBook;
   onSelect: (book: ReadingBook) => void;
 }) {
-  const [query, setQuery] = useState('');
-  const filteredBooks = books.filter((book) =>
-    `${book.title} ${book.author}`.toLowerCase().includes(query.trim().toLowerCase())
-  );
-
   return (
     <div className="book-picker">
       <div className="book-picker-trigger">
@@ -636,29 +710,53 @@ function BookPicker({
         </span>
       </div>
 
-      <div className="book-choice-panel">
-        <span className="eyebrow">escolha o livro de hoje</span>
-        <input
-          className="field"
-          placeholder="buscar na sua biblioteca"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <div className="book-choice-list">
-          {filteredBooks.map((book) => (
-            <button
-              key={book.id}
-              className={`book-choice ${book.id === activeBook.id ? 'book-choice--active' : ''}`}
-              onClick={() => onSelect(book)}
-            >
-              <BookThumb src={bookCoverSrc(book, 'S')} title={book.title} size="sm" />
-              <span>
-                <strong>{book.title}</strong>
-                <small>{book.author}</small>
-              </span>
-            </button>
+      <label className="compact-field">
+        <span>escolha o livro de hoje</span>
+        <select
+          value={activeBook.id}
+          onChange={(event) => {
+            const selected = books.find((book) => book.id === event.target.value);
+            if (selected) onSelect(selected);
+          }}
+        >
+          {books.map((book) => (
+            <option key={book.id} value={book.id}>
+              {book.title} - {book.author}
+            </option>
           ))}
-        </div>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function QuickChoices({
+  label,
+  options,
+  value,
+  suffix = '',
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  suffix?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="quick-choice">
+      <span>{label}</span>
+      <div>
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={value === option ? 'quick-choice--active' : ''}
+            onClick={() => onChange(option)}
+          >
+            {option}{suffix}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -673,7 +771,7 @@ function buildPracticeSuggestions(dateIso: string, musicPrefs: string[]): Record
     },
     {
       title: 'Flowtime gentil',
-      action: 'Comece sem timer rígido. Quando perder clareza, pare, anote o tempo e faça uma pausa proporcional.',
+      action: 'Escolha uma tarefa concreta e ligue um cronômetro crescente. Trabalhe até perceber queda de clareza, inquietação ou vontade forte de trocar de aba. Pare, anote quantos minutos focou e faça uma pausa proporcional: 5 min se focou até 25 min, 8 min se focou até 50 min, 10 a 15 min se passou de 50 min.',
     },
     {
       title: 'Bloco 50/10',
@@ -768,13 +866,110 @@ function buildResourceSuggestions(day: number, prefs: ContentPref[]): ResourceSu
   ];
 }
 
-function localAiSummary(suggestions: Record<MindType, PracticeSuggestion>, resources: ResourceSuggestion[]) {
+function localSuggestionItems(
+  suggestions: Record<MindType, PracticeSuggestion>,
+  resources: ResourceSuggestion[],
+): MindSuggestionItem[] {
   return [
-    `Foco: ${suggestions.foco.title}.`,
-    `Som: ${suggestions.som.title}.`,
-    `Pausa: "${suggestions.pausa.title}"`,
-    `Repertório: ${resources[0]?.subtitle ?? 'um modelo mental curto'}.`,
-  ].join(' ');
+    {
+      kind: 'foco',
+      short: 'F',
+      label: 'Foco',
+      value: suggestions.foco.title,
+      instruction: suggestions.foco.detail,
+      practice: 'foco',
+    },
+    {
+      kind: 'som',
+      short: 'S',
+      label: 'Som',
+      value: suggestions.som.title,
+      instruction: suggestions.som.detail,
+      href: suggestions.som.link,
+    },
+    {
+      kind: 'pausa',
+      short: 'P',
+      label: 'Pausa',
+      value: suggestions.pausa.title,
+      instruction: suggestions.pausa.detail,
+      practice: 'pausa',
+    },
+    {
+      kind: 'repertorio',
+      short: 'R',
+      label: 'Repertório',
+      value: resources[0]?.subtitle ?? 'um modelo mental curto',
+      instruction: resources[0]?.detail,
+      href: resources[0]?.link,
+    },
+  ];
+}
+
+function parseAiSuggestions(
+  note: string,
+  suggestions: Record<MindType, PracticeSuggestion>,
+  resources: ResourceSuggestion[],
+): MindSuggestionItem[] {
+  const fallback = note.trim();
+  const lines = note
+    .split(/\n|(?=\b(?:Foco|Som|Pausa|Repertório):)/i)
+    .map((line) => line.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean);
+  const parsed = lines.map((line) => {
+    const [rawLabel, ...rest] = line.split(':');
+    const label = rawLabel?.trim() || 'Sugestão';
+    const rawValue = rest.join(':').trim() || fallback;
+    const [value, parsedInstruction] = splitSuggestionLine(rawValue);
+    const normalized = label.toLowerCase();
+    const kind = normalized.includes('som')
+      ? 'som'
+      : normalized.includes('pausa')
+        ? 'pausa'
+        : normalized.includes('repert')
+          ? 'repertorio'
+          : 'foco';
+    const href = kind === 'som' ? suggestions.som.link : kind === 'repertorio' ? resources[0]?.link : undefined;
+    const practice: MindType | undefined = kind === 'foco' ? 'foco' : kind === 'pausa' ? 'pausa' : undefined;
+
+    return {
+      kind,
+      short: label.charAt(0).toUpperCase(),
+      label,
+      value,
+      instruction: parsedInstruction || defaultSuggestionPhrase(kind, suggestions, resources),
+      href,
+      practice,
+    };
+  });
+
+  return parsed.length
+    ? parsed.slice(0, 4)
+    : [{ kind: 'foco', short: 'S', label: 'Sugestão', value: fallback, practice: 'foco' }];
+}
+
+function splitSuggestionLine(text: string): [string, string] {
+  const clean = text.replace(/^[-–—]\s*/, '').trim();
+  const [title, ...rest] = clean.split(/\s[-–—]\s/);
+  if (rest.length) return [title.trim(), firstSentence(rest.join(' - '))];
+
+  return [firstSentence(clean), ''];
+}
+
+function firstSentence(text: string): string {
+  const match = text.trim().match(/^(.+?[.!?])(?:\s|$)/);
+  return (match?.[1] ?? text.trim()).slice(0, 120);
+}
+
+function defaultSuggestionPhrase(
+  kind: string,
+  suggestions: Record<MindType, PracticeSuggestion>,
+  resources: ResourceSuggestion[],
+): string {
+  if (kind === 'som') return suggestions.som.detail;
+  if (kind === 'pausa') return suggestions.pausa.detail;
+  if (kind === 'repertorio') return resources[0]?.detail ?? 'Uma lente simples para o dia.';
+  return suggestions.foco.detail;
 }
 
 function defaultPracticeLog(type: MindType): PracticeLog {

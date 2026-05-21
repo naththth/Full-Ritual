@@ -1,64 +1,108 @@
 /* =====================================================================
-   FULL RITUAL · DESIGN TOKENS
-   Toda a linguagem visual em variáveis CSS. Não duplicar valores.
+   FULL RITUAL · DESIGN TOKENS · v2 (vibrante, premium, imersivo)
    ===================================================================== */
 
 :root {
   /* ---------- COR · base e texto ---------- */
   --ivory:           #F5EEDF;
   --ivory-2:         #EDE4D1;
+  --ivory-warm:      #FAEFD6;
   --paper:           #FBF6EB;
   --camel:           #C8B58C;
-  --chocolate:       #4A2C22;
+  --gold:            #D4A24C;
+  --gold-deep:       #B8862F;
+  --chocolate:       #3A1F16;
+  --chocolate-deep:  #2B130E;
   --chocolate-soft:  #6B4A3E;
+  --night:           #1A0E0A;
 
-  /* ---------- COR · dimensões (semântico, nunca decorativo) ---------- */
-  --skin:    #D89A82;  /* Pele     · Warm Blush     · ink chocolate */
-  --body:    #B85A1F;  /* Corpo    · Burnt Orange   · ink ivory */
-  --mind:    #1F4751;  /* Mente    · Deep Teal      · ink ivory */
-  --diet:    #54683E;  /* Dieta    · Olive Green    · ink ivory */
-  --spirit:  #4A2A3F;  /* Espírito · Aubergine      · ink ivory */
+  /* ---------- COR · dimensões (intensificadas, mais vibrantes) ---------- */
+  --skin:        #E07A55;  /* Pele     · Coral Blush ardente */
+  --skin-deep:   #B8472A;
+  --skin-glow:   #F4A084;
 
-  /* Ink por dimensão (uso direto para evitar overrides) */
-  --ink-on-skin:    var(--chocolate);
+  --body:        #D9501A;  /* Corpo    · Burnt Orange vivo */
+  --body-deep:   #8E2E08;
+  --body-glow:   #F47A3A;
+
+  --mind:        #0E5B6E;  /* Mente    · Teal profundo */
+  --mind-deep:   #062F3B;
+  --mind-glow:   #2FA0B8;
+
+  --diet:        #5B7A38;  /* Dieta    · Verde-musgo vibrante */
+  --diet-deep:   #2E4419;
+  --diet-glow:   #92B95F;
+
+  --spirit:      #6B2856;  /* Espírito · Aubergine profundo */
+  --spirit-deep: #3A0F2D;
+  --spirit-glow: #B25893;
+
+  /* Ink por dimensão */
+  --ink-on-skin:    var(--chocolate-deep);
   --ink-on-body:    var(--ivory);
   --ink-on-mind:    var(--ivory);
   --ink-on-diet:    var(--ivory);
   --ink-on-spirit:  var(--ivory);
 
-  /* ---------- COR · acentos auxiliares (usar com parcimônia) ---------- */
-  --terracota:  #9C4A2D;
-  --mustard:    #C48A2A;
-  --sage:       #8D9D89;
-  --rosewood:   #6B342E;  /* care alert · nunca erro técnico */
+  /* ---------- GRADIENTES (auras premium) ---------- */
+  --grad-skin:    linear-gradient(135deg, #F4A084 0%, #E07A55 45%, #B8472A 100%);
+  --grad-body:    linear-gradient(135deg, #F47A3A 0%, #D9501A 50%, #8E2E08 100%);
+  --grad-mind:    linear-gradient(135deg, #2FA0B8 0%, #0E5B6E 50%, #062F3B 100%);
+  --grad-diet:    linear-gradient(135deg, #92B95F 0%, #5B7A38 50%, #2E4419 100%);
+  --grad-spirit:  linear-gradient(135deg, #B25893 0%, #6B2856 50%, #3A0F2D 100%);
+  --grad-gold:    linear-gradient(135deg, #F4D88A 0%, #D4A24C 50%, #B8862F 100%);
+  --grad-aurora:  linear-gradient(135deg, #6B2856 0%, #0E5B6E 35%, #5B7A38 70%, #D9501A 100%);
+  --grad-night:   linear-gradient(180deg, #2B130E 0%, #1A0E0A 100%);
 
-  /* ---------- LINHAS E SOMBRAS ---------- */
-  --line:         rgba(74, 44, 34, 0.10);
-  --line-strong:  rgba(74, 44, 34, 0.18);
-  --shadow:       0 18px 40px rgba(74, 44, 34, 0.10);
-  --shadow-s:     0 6px 18px rgba(74, 44, 34, 0.06);
+  /* ---------- COR · acentos ---------- */
+  --terracota:  #C04A1F;
+  --mustard:    #D4A24C;
+  --sage:       #8FAE7E;
+  --rosewood:   #8B2F26;
 
-  /* ---------- TIPOGRAFIA ---------- */
-  --display: 'Instrument Serif', 'Cormorant Garamond', serif;
-  --sans:    'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --mono:    'IBM Plex Mono', 'SF Mono', monospace;
+  /* ---------- LINHAS E SOMBRAS (mais profundas) ---------- */
+  --line:         rgba(58, 31, 22, 0.12);
+  --line-strong:  rgba(58, 31, 22, 0.22);
+  --line-gold:    rgba(212, 162, 76, 0.32);
 
-  /* Escala — 8 tamanhos, nada mais */
-  --fs-display-xl: 56px;
-  --fs-display-lg: 40px;
-  --fs-display-md: 28px;
+  --shadow:       0 24px 56px rgba(58, 31, 22, 0.18), 0 8px 22px rgba(58, 31, 22, 0.10);
+  --shadow-s:     0 8px 22px rgba(58, 31, 22, 0.10);
+  --shadow-lift:  0 32px 70px rgba(58, 31, 22, 0.22), 0 12px 30px rgba(58, 31, 22, 0.14);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 0 -1px 0 rgba(58, 31, 22, 0.06);
+
+  --glow-skin:    0 0 32px rgba(224, 122, 85, 0.45);
+  --glow-body:    0 0 32px rgba(217, 80, 26, 0.45);
+  --glow-mind:    0 0 32px rgba(14, 91, 110, 0.50);
+  --glow-diet:    0 0 32px rgba(91, 122, 56, 0.45);
+  --glow-spirit:  0 0 32px rgba(107, 40, 86, 0.55);
+  --glow-gold:    0 0 28px rgba(212, 162, 76, 0.55);
+
+  /* ---------- TIPOGRAFIA ----------
+     UMA fonte para todo o app: Plus Jakarta Sans (variable, italic).
+     Diferenciação por peso + tamanho. Sem serifa, sem mono.
+     Números tabulares vêm da feature 'tnum' (ver .t-mono-num). */
+  --sans:    'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+  --display: var(--sans);
+  --mono:    var(--sans);
+  --label:   var(--sans);
+
+  /* Escala — tudo um degrau acima pra ler de verdade no mobile */
+  --fs-display-xl: 60px;
+  --fs-display-lg: 44px;
+  --fs-display-md: 30px;
   --fs-body-lg:    17px;
-  --fs-body:       14px;
-  --fs-body-sm:    12px;
-  --fs-mono-num:   32px;
-  --fs-mono-label: 10px;
+  --fs-body:       15.5px;
+  --fs-body-sm:    13px;
+  --fs-mono-num:   34px;
+  --fs-label:      11.5px;
+  --fs-mono-label: 11.5px; /* alias legado */
 
   /* ---------- RAIOS ---------- */
-  --radius-card:  22px;
-  --radius-block: 18px;
+  --radius-card:  26px;
+  --radius-block: 20px;
   --radius-pill:  999px;
 
-  /* ---------- ESPAÇAMENTOS (escala 4px) ---------- */
+  /* ---------- ESPAÇAMENTOS ---------- */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -69,40 +113,43 @@
   --s-8: 40px;
   --s-9: 56px;
 
-  /* ---------- MOVIMENTO · respira, não acelera ---------- */
+  /* ---------- MOVIMENTO ---------- */
   --t-fast:   180ms;
   --t-base:   320ms;
   --t-slow:   640ms;
-  --t-breath: 4000ms;
+  --t-breath: 4200ms;
+  --t-aurora: 22000ms;
+  --t-spin:   60000ms;
 
   --e-out:   cubic-bezier(0.16, 0.84, 0.4, 1);
   --e-in:    cubic-bezier(0.6, 0, 0.84, 0.16);
   --e-soft:  cubic-bezier(0.4, 0, 0.2, 1);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ---------- LAYOUT MOBILE ---------- */
-  --nav-h:        78px;
+  --nav-h:        82px;
   --safe-bottom:  env(safe-area-inset-bottom, 0px);
   --safe-top:     env(safe-area-inset-top, 0px);
 }
 
 /* =====================================================================
-   UTILITÁRIOS TIPOGRÁFICOS (não usar fora dos componentes principais)
+   UTILITÁRIOS TIPOGRÁFICOS
    ===================================================================== */
-.t-display-xl { font-family: var(--display); font-size: var(--fs-display-xl); line-height: 0.95; letter-spacing: 0; font-weight: 400; }
-.t-display-lg { font-family: var(--display); font-size: var(--fs-display-lg); line-height: 1.0;  letter-spacing: 0; font-weight: 400; }
-.t-display-md { font-family: var(--display); font-size: var(--fs-display-md); line-height: 1.05; letter-spacing: 0;  font-weight: 400; }
-.t-display-italic { font-family: var(--display); font-style: italic; font-weight: 400; }
+.t-display-xl { font-family: var(--sans); font-size: var(--fs-display-xl); line-height: 0.98; letter-spacing: -0.03em; font-weight: 700; }
+.t-display-lg { font-family: var(--sans); font-size: var(--fs-display-lg); line-height: 1.02; letter-spacing: -0.025em; font-weight: 700; }
+.t-display-md { font-family: var(--sans); font-size: var(--fs-display-md); line-height: 1.1;  letter-spacing: -0.02em; font-weight: 700; }
+.t-display-italic { font-family: var(--sans); font-style: italic; font-weight: 600; }
 
-.t-body-lg { font-family: var(--sans); font-size: var(--fs-body-lg); line-height: 1.5;  font-weight: 400; }
-.t-body    { font-family: var(--sans); font-size: var(--fs-body);    line-height: 1.45; font-weight: 400; }
-.t-body-sm { font-family: var(--sans); font-size: var(--fs-body-sm); line-height: 1.45; font-weight: 400; }
+.t-body-lg { font-family: var(--sans); font-size: var(--fs-body-lg); line-height: 1.55; font-weight: 500; }
+.t-body    { font-family: var(--sans); font-size: var(--fs-body);    line-height: 1.55; font-weight: 500; }
+.t-body-sm { font-family: var(--sans); font-size: var(--fs-body-sm); line-height: 1.5;  font-weight: 500; }
 
-.t-mono-num   { font-family: var(--mono); font-size: var(--fs-mono-num); line-height: 1; font-weight: 400; }
+.t-mono-num   { font-family: var(--sans); font-size: var(--fs-mono-num); line-height: 1; font-weight: 700; font-feature-settings: 'tnum' 1, 'lnum' 1; letter-spacing: -0.025em; }
 .t-mono-label {
-  font-family: var(--mono);
-  font-size: var(--fs-mono-label);
-  font-weight: 500;
-  letter-spacing: 0.18em;
+  font-family: var(--sans);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(74, 44, 34, 0.55);
+  color: rgba(58, 31, 22, 0.62);
 }
