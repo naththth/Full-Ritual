@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../store/useStore';
 import { supabase, hasSupabase } from '../lib/supabase';
+import { useAutoSave } from '../lib/useAutoSave';
 import type {
   SkinType, SportModality, MusicPref, ContentPref, SpiritTheme,
 } from '../types';
@@ -104,11 +105,12 @@ export function Profile() {
     setPhotoUrl(pub.publicUrl);
   };
 
-  const save = async () => {
-    if (!hasSupabase || !userId) {
-      showToast('configure o Supabase para salvar.');
-      return;
-    }
+  const saveKey = JSON.stringify({
+    name, birthdate, skinType, sports, music, content, themes, photoUrl,
+  });
+
+  useAutoSave(saveKey, async () => {
+    if (!hasSupabase || !userId) return;
     const { error } = await supabase.from('profiles').upsert({
       id: userId,
       name,
@@ -121,11 +123,10 @@ export function Profile() {
       photo_url: photoUrl,
     });
     if (error) {
+      console.error(error);
       showToast('não foi possível salvar.');
-      return;
     }
-    showToast('perfil atualizado.');
-  };
+  });
 
   return (
     <div className="screen stack-md">
@@ -248,10 +249,6 @@ export function Profile() {
         selected={themes}
         onToggle={(v) => toggle(themes, v, setThemes)}
       />
-
-      <button className="btn btn--primary btn--full" onClick={save}>
-        guardar preferências
-      </button>
 
       <div style={{ height: 40 }} />
     </div>

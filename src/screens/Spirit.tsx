@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { relativeDateLabel } from '../lib/dates';
+import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
@@ -35,36 +35,30 @@ export function Spirit() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
   const [spirit, setSpirit] = useLocalState<SpiritState>(`full-ritual-spirit-${selectedDate}`, initialSpirit);
-  const [saving, setSaving] = useState(false);
   const dateLabel = relativeDateLabel(selectedDate);
 
   const update = <K extends keyof SpiritState>(key: K, value: SpiritState[K]) => {
     setSpirit((current) => ({ ...current, [key]: value }));
   };
 
-  const save = async () => {
-    setSaving(true);
+  useAutoSave(spirit, async () => {
+    if (!hasSupabase || !userId) return;
     try {
-      if (hasSupabase && userId) {
-        const { error } = await supabase.from('spirit_logs').insert({
-          user_id: userId,
-          date: selectedDate,
-          intention: spirit.intention || null,
-          gratitude: spirit.gratitude ? [spirit.gratitude] : [],
-          mood: spirit.mood,
-          theme: spirit.theme,
-          notes: spirit.relief || null,
-        });
-        if (error) throw error;
-      }
-      showToast('espírito guardado.');
+      const { error } = await supabase.from('spirit_logs').upsert({
+        user_id: userId,
+        date: selectedDate,
+        intention: spirit.intention || null,
+        gratitude: spirit.gratitude ? [spirit.gratitude] : [],
+        mood: spirit.mood,
+        theme: spirit.theme,
+        notes: spirit.relief || null,
+      }, { onConflict: 'user_id,date' });
+      if (error) throw error;
     } catch (error) {
       console.error(error);
       showToast('não foi possível salvar espírito.');
-    } finally {
-      setSaving(false);
     }
-  };
+  });
 
   return (
     <div className="screen stack-md spirit-screen">
@@ -144,9 +138,6 @@ export function Spirit() {
         />
       </section>
 
-      <button className="btn btn--primary btn--full" onClick={save} disabled={saving}>
-        {saving ? 'guardando…' : `guardar espírito de ${dateLabel}`}
-      </button>
     </div>
   );
 }

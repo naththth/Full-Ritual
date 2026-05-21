@@ -382,7 +382,9 @@ export function Mind() {
           };
         });
 
-        const { error } = await supabase.from('mind_logs').insert(rows);
+        const { error } = await supabase
+          .from('mind_logs')
+          .upsert(rows, { onConflict: 'user_id,date,type' });
         if (error) throw error;
       }
       showToast('mente guardada.');

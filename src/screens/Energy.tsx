@@ -3,6 +3,7 @@ import { PresenceSlider } from '../components/PresenceSlider';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, diffMinutes, isoToday, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
+import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { useApp } from '../store/useStore';
 import type { CyclePhase, SleepLog } from '../types';
@@ -99,9 +100,6 @@ export function Energy() {
   const [sleepQuality, setSleepQuality] = useState(7);
   const [sleepNotes, setSleepNotes] = useState('');
   const [activeCycleDate, setActiveCycleDate] = useState(selectedDate);
-  const [savingCheckin, setSavingCheckin] = useState(false);
-  const [savingSleep, setSavingSleep] = useState(false);
-  const [savingCycle, setSavingCycle] = useState(false);
 
   const duration = diffMinutes(bedtime, wakeTime);
   const dateLabel = relativeDateLabel(selectedDate);
@@ -157,37 +155,28 @@ export function Energy() {
     });
   };
 
-  const saveCheckin = async () => {
-    setSavingCheckin(true);
+  useAutoSave(rawCheckin, async () => {
+    if (!hasSupabase || !userId) return;
     try {
-      if (hasSupabase && userId) {
-        const { error } = await supabase.from('checkins').insert({
-          user_id: userId,
-          date: selectedDate,
-          energy: checkin.energy,
-          calm: checkin.calm,
-          skin_state: checkin.skinState,
-          body_state: checkin.bodyState,
-          signals: checkin.signals,
-          note: checkin.note || null,
-        });
-        if (error) throw error;
-      }
-      showToast('energia registrada.');
+      const { error } = await supabase.from('checkins').upsert({
+        user_id: userId,
+        date: selectedDate,
+        energy: checkin.energy,
+        calm: checkin.calm,
+        skin_state: checkin.skinState,
+        body_state: checkin.bodyState,
+        signals: checkin.signals,
+        note: checkin.note || null,
+      }, { onConflict: 'user_id,date' });
+      if (error) throw error;
     } catch (error) {
       console.error(error);
       showToast('não foi possível salvar a energia.');
-    } finally {
-      setSavingCheckin(false);
     }
-  };
+  });
 
-  const saveSleep = async () => {
-    if (!duration) {
-      showToast('preencha os horários do sono.');
-      return;
-    }
-    setSavingSleep(true);
+  useAutoSave(`${bedtime}|${wakeTime}|${sleepQuality}|${sleepNotes}`, async () => {
+    if (!duration) return;
 
     const log: SleepLog = {
       id: currentSleep?.id ?? crypto.randomUUID(),
@@ -220,17 +209,13 @@ export function Energy() {
       } else {
         setSleepLogs((current) => [...current.filter((item) => item.date !== selectedDate), log]);
       }
-      showToast('sono registrado.');
     } catch (error) {
       console.error(error);
       showToast('não foi possível salvar o sono.');
-    } finally {
-      setSavingSleep(false);
     }
-  };
+  });
 
-  const saveCycle = async () => {
-    setSavingCycle(true);
+  useAutoSave(rawCyclePrefs, async () => {
     const nextPrefs = {
       start: cyclePrefs.start || selectedDate,
       length: Number(cyclePrefs.length) || 28,
@@ -238,7 +223,6 @@ export function Energy() {
     };
 
     try {
-      setCyclePrefs(nextPrefs);
       if (hasSupabase && userId) {
         const { data, error } = await supabase
           .from('profiles')
@@ -261,14 +245,11 @@ export function Energy() {
           cycle_length: nextPrefs.length,
         });
       }
-      showToast('ciclo atualizado.');
     } catch (error) {
       console.error(error);
       showToast('não foi possível salvar o ciclo.');
-    } finally {
-      setSavingCycle(false);
     }
-  };
+  });
 
   return (
     <div className="screen stack-md energy-screen">
@@ -321,9 +302,6 @@ export function Energy() {
           value={checkin.note}
           onChange={(event) => setCheckinField('note', event.target.value)}
         />
-        <button className="btn btn--primary btn--full" onClick={saveCheckin} disabled={savingCheckin}>
-          {savingCheckin ? 'salvando…' : 'salvar check-in'}
-        </button>
       </section>
 
       <section className="card stack">
@@ -346,9 +324,6 @@ export function Energy() {
           <input type="range" min={0} max={10} value={sleepQuality} onChange={(event) => setSleepQuality(Number(event.target.value))} />
         </label>
         <textarea className="field" placeholder="despertares, tela, treino, álcool, sonhos..." value={sleepNotes} onChange={(event) => setSleepNotes(event.target.value)} />
-        <button className="btn btn--primary btn--full" onClick={saveSleep} disabled={savingSleep}>
-          {savingSleep ? 'salvando…' : 'salvar sono'}
-        </button>
       </section>
 
       <section className="card stack energy-cycle-card">
@@ -412,9 +387,6 @@ export function Energy() {
             </button>
           ))}
         </div>
-        <button className="btn btn--secondary btn--full" onClick={saveCycle} disabled={savingCycle}>
-          {savingCycle ? 'salvando…' : 'salvar ciclo'}
-        </button>
       </section>
     </div>
   );

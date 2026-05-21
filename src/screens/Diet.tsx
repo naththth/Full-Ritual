@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
+import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
@@ -27,7 +27,6 @@ export function Diet() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
   const [diet, setDiet] = useLocalState<DietState>(`full-ritual-diet-${selectedDate}`, initialDiet);
-  const [saving, setSaving] = useState(false);
   const dateLabel = relativeDateLabel(selectedDate);
 
   const target = 2.5;
@@ -77,36 +76,31 @@ export function Diet() {
     }
   };
 
-  const saveMeals = async () => {
-    setSaving(true);
+  useAutoSave(diet, async () => {
+    if (!hasSupabase || !userId) return;
     try {
-      if (hasSupabase && userId) {
-        for (const meal of MEALS) {
-          const state = diet.meals[meal.id];
-          if (!state) continue;
-          const items = meal.variants[state.variant] ?? meal.variants.principal;
-          const checked = items.filter((_, index) => state.checks[index]).map((item) => item.title);
-          if (!checked.length && !state.photoUrl) continue;
+      for (const meal of MEALS) {
+        const state = diet.meals[meal.id];
+        if (!state) continue;
+        const items = meal.variants[state.variant] ?? meal.variants.principal;
+        const checked = items.filter((_, index) => state.checks[index]).map((item) => item.title);
+        if (!checked.length && !state.photoUrl) continue;
 
-          const { error } = await supabase.from('meal_logs').insert({
-            user_id: userId,
-            date: selectedDate,
-            meal_type: meal.mealType,
-            ingredients: checked,
-            photo_url: state.photoUrl ?? null,
-            notes: `${meal.title} · ${state.variant}`,
-          });
-          if (error) throw error;
-        }
+        const { error } = await supabase.from('meal_logs').upsert({
+          user_id: userId,
+          date: selectedDate,
+          meal_type: meal.mealType,
+          ingredients: checked,
+          photo_url: state.photoUrl ?? null,
+          notes: `${meal.title} · ${state.variant}`,
+        }, { onConflict: 'user_id,date,meal_type' });
+        if (error) throw error;
       }
-      showToast('dieta guardada.');
     } catch (error) {
       console.error(error);
       showToast('não foi possível salvar a dieta.');
-    } finally {
-      setSaving(false);
     }
-  };
+  });
 
   return (
     <div className="screen stack-md">
@@ -219,9 +213,6 @@ export function Diet() {
         );
       })}
 
-      <button className="btn btn--primary btn--full" onClick={saveMeals} disabled={saving}>
-        {saving ? 'salvando…' : `salvar dieta de ${dateLabel}`}
-      </button>
     </div>
   );
 }

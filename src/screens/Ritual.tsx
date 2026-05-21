@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ROUTINES, getRoutineTasks, type RoutineArea, type RoutinePeriod } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
+import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { useApp } from '../store/useStore';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -10,7 +11,6 @@ type RoutineChecks = Record<string, boolean>;
 
 export function Ritual() {
   const showToast = useApp((s) => s.showToast);
-  const goTo = useApp((s) => s.goTo);
   const userId = useApp((s) => s.userId);
   const selectedDate = useApp((s) => s.selectedDate);
 
@@ -19,7 +19,6 @@ export function Ritual() {
   const [checks, setChecks] = useLocalState<RoutineChecks>(`full-ritual-routine-checks-${selectedDate}`, {});
   const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(`full-ritual-skin-photo-${selectedDate}`, null);
   const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const routine: Record<RoutineArea, ReturnType<typeof getRoutineTasks>> = {
     face: getRoutineTasks(period, 'face', selectedDate),
@@ -61,30 +60,23 @@ export function Ritual() {
     }
   };
 
-  const save = async () => {
-    setSaving(true);
+  useAutoSave(`${period}|${skinPhoto ?? ''}|${note}`, async () => {
+    if (!hasSupabase || !userId) return;
+    if (!skinPhoto && !note) return;
     try {
-      if (hasSupabase && userId) {
-        if (skinPhoto) {
-          const { error: skinError } = await supabase.from('skincare_logs').insert({
-            user_id: userId,
-            date: selectedDate,
-            time_of_day: period === 'day' ? 'manha' : 'noite',
-            skin_signal: note || null,
-            photo_url: skinPhoto,
-          });
-          if (skinError) throw skinError;
-        }
-      }
-      showToast('rotina de pele guardada.');
-      goTo('home');
+      const { error } = await supabase.from('skincare_logs').upsert({
+        user_id: userId,
+        date: selectedDate,
+        time_of_day: period === 'day' ? 'manha' : 'noite',
+        skin_signal: note || null,
+        photo_url: skinPhoto,
+      }, { onConflict: 'user_id,date,time_of_day' });
+      if (error) throw error;
     } catch (error) {
-      showToast('não foi possível guardar agora.');
       console.error(error);
-    } finally {
-      setSaving(false);
+      showToast('não foi possível guardar agora.');
     }
-  };
+  });
 
   return (
     <div className="screen stack-md ritual-screen">
@@ -193,9 +185,6 @@ export function Ritual() {
         />
       </section>
 
-      <button className="btn btn--primary btn--full" onClick={save} disabled={saving}>
-        {saving ? 'guardando…' : 'guardar rotina de pele'}
-      </button>
     </div>
   );
 }
