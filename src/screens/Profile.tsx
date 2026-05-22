@@ -122,6 +122,10 @@ export function Profile() {
   const [content, setContent] = useState<ContentPref[]>(profile?.content_prefs ?? []);
   const [themes, setThemes] = useState<SpiritTheme[]>(profile?.spirit_themes ?? []);
   const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.photo_url ?? null);
+  const [goalSleepH, setGoalSleepH] = useState(profile?.goal_sleep_h ?? 8);
+  const [goalWaterL, setGoalWaterL] = useState(profile?.goal_water_l ?? 2.5);
+  const [goalMeditationMin, setGoalMeditationMin] = useState(profile?.goal_meditation_min ?? 10);
+  const [goalReadingPages, setGoalReadingPages] = useState(profile?.goal_reading_pages ?? 20);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -159,6 +163,7 @@ export function Profile() {
 
   const saveKey = JSON.stringify({
     name, birthdate, skinType, sports, music, content, themes, photoUrl,
+    goalSleepH, goalWaterL, goalMeditationMin, goalReadingPages,
   });
 
   const buildProfilePayload = () => ({
@@ -171,6 +176,10 @@ export function Profile() {
     content_prefs: content,
     spirit_themes: themes,
     photo_url: photoUrl,
+    goal_sleep_h: goalSleepH,
+    goal_water_l: goalWaterL,
+    goal_meditation_min: goalMeditationMin,
+    goal_reading_pages: goalReadingPages,
   });
 
   const saveProfile = async (showSuccess = true) => {
@@ -202,6 +211,10 @@ export function Profile() {
           target_date: current?.target_date ?? null,
           ai_enabled: current?.ai_enabled ?? true,
           notifications_enabled: current?.notifications_enabled ?? true,
+          goal_sleep_h: payload.goal_sleep_h,
+          goal_water_l: payload.goal_water_l,
+          goal_meditation_min: payload.goal_meditation_min,
+          goal_reading_pages: payload.goal_reading_pages,
           created_at: current?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -365,11 +378,85 @@ export function Profile() {
         onToggle={(v) => toggle(themes, v, setThemes)}
       />
 
+      <section className="card stack">
+        <span className="eyebrow">metas · saúde diária</span>
+        <p className="t-body-sm muted">Usadas nos relatórios de progresso e alertas de débito.</p>
+        <div className="profile-goals-grid">
+          <GoalField
+            label="sono"
+            unit="h"
+            value={goalSleepH}
+            min={5}
+            max={10}
+            step={0.5}
+            onChange={setGoalSleepH}
+          />
+          <GoalField
+            label="água"
+            unit="L"
+            value={goalWaterL}
+            min={1}
+            max={5}
+            step={0.25}
+            onChange={setGoalWaterL}
+          />
+          <GoalField
+            label="meditação"
+            unit="min"
+            value={goalMeditationMin}
+            min={5}
+            max={60}
+            step={5}
+            onChange={setGoalMeditationMin}
+          />
+          <GoalField
+            label="leitura"
+            unit="pág"
+            value={goalReadingPages}
+            min={5}
+            max={100}
+            step={5}
+            onChange={setGoalReadingPages}
+          />
+        </div>
+      </section>
+
       <button className="btn btn--primary btn--full" onClick={() => void saveProfile()} disabled={saving}>
         {saving ? 'salvando...' : 'salvar alterações'}
       </button>
 
       <div style={{ height: 40 }} />
+    </div>
+  );
+}
+
+function GoalField({
+  label, unit, value, min, max, step, onChange,
+}: {
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="goal-field">
+      <span className="eyebrow">{label}</span>
+      <div className="goal-field__value">
+        <strong>{value}</strong>
+        <span>{unit}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={`Meta de ${label}: ${value} ${unit}`}
+      />
     </div>
   );
 }

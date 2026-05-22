@@ -50,6 +50,11 @@ export interface Profile {
   ai_enabled: boolean;
   notifications_enabled: boolean;
 
+  goal_sleep_h: number | null;
+  goal_water_l: number | null;
+  goal_meditation_min: number | null;
+  goal_reading_pages: number | null;
+
   created_at: string;
   updated_at: string;
 }

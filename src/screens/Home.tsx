@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
-import { dateFromIso, isoToday, relativeDateLabel, weekDaysAround } from '../lib/dates';
+import { addDays, dateFromIso, isoToday, lastDays, relativeDateLabel, weekDaysAround } from '../lib/dates';
 import { readJson } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { type DailyScore, type DimensionKey, type Insight } from '../types';
@@ -113,6 +113,7 @@ export function Home() {
   const setSelectedDate = useApp((s) => s.setSelectedDate);
   const [latestInsight, setLatestInsight] = useState<Insight | null>(null);
   const [dailyScore, setDailyScore] = useState<DailyScore | null>(null);
+  const [streak, setStreak] = useState(0);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
@@ -230,16 +231,44 @@ export function Home() {
   }, []);
 
   useEffect(() => {
-    if (!hasSupabase || !userId) return;
+    if (!hasSupabase || !userId) {
+      // Compute streak from localStorage
+      let count = 0;
+      let date = new Date();
+      while (count < 365) {
+        const iso = isoToday(date);
+        const hasActivity =
+          localStorage.getItem(`full-ritual-energy-${iso}`) !== null ||
+          localStorage.getItem(`full-ritual-spirit-${iso}`) !== null ||
+          localStorage.getItem(`full-ritual-diet-${iso}`) !== null;
+        if (!hasActivity) break;
+        count++;
+        date = addDays(date, -1);
+      }
+      setStreak(count);
+      return;
+    }
 
+    const since = lastDays(90)[0];
     void Promise.all([
       supabase.from('insights').select('*').order('date', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('daily_scores').select('*').eq('date', selectedDate).maybeSingle(),
-    ]).then(([insightRes, scoreRes]) => {
+      supabase.from('checkins').select('date').gte('date', since).order('date', { ascending: false }),
+    ]).then(([insightRes, scoreRes, checkinRes]) => {
       if (insightRes.error) console.error(insightRes.error);
       if (scoreRes.error) console.error(scoreRes.error);
       setLatestInsight((insightRes.data as Insight | null) ?? null);
       setDailyScore((scoreRes.data as DailyScore | null) ?? null);
+
+      const activeDates = new Set((checkinRes.data ?? []).map((r: { date: string }) => r.date));
+      let count = 0;
+      let date = new Date();
+      while (count < 90) {
+        if (!activeDates.has(isoToday(date))) break;
+        count++;
+        date = addDays(date, -1);
+      }
+      setStreak(count);
     });
   }, [selectedDate, userId]);
 
@@ -307,6 +336,12 @@ export function Home() {
             <strong>{energyLabel}</strong>
             <span>energia</span>
           </button>
+          {streak > 0 && (
+            <button onClick={() => goTo('insight')}>
+              <strong>{streak}d</strong>
+              <span>sequência</span>
+            </button>
+          )}
         </div>
         <div className="insight-copy">
           <p className="insight-title">{dailyInsight.title}</p>

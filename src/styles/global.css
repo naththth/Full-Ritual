@@ -920,6 +920,65 @@ img { display: block; max-width: 100%; }
   margin: 0;
 }
 
+.insight-history {
+  padding: 0;
+  overflow: hidden;
+}
+
+.insight-history summary {
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.insight-history summary::-webkit-details-marker {
+  display: none;
+}
+
+.insight-history summary span,
+.insight-history summary strong {
+  display: block;
+}
+
+.insight-history summary strong {
+  margin-top: 4px;
+  color: var(--spirit);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.insight-history > .stack {
+  padding: 0 18px 18px;
+}
+
+.insight-history[open] summary .circle-button .icon-plus {
+  display: none;
+}
+
+.insight-history[open] summary .circle-button .icon-minus {
+  display: inline;
+}
+
+.insight-history__item {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(74, 44, 34, 0.10);
+}
+
+.insight-history__item strong {
+  color: var(--chocolate);
+}
+
+.insight-history__item p {
+  margin: 0;
+}
+
 .insight-number-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3171,6 +3230,148 @@ input[type="range"] {
   letter-spacing: 0.10em;
   text-transform: uppercase;
   color: rgba(74, 44, 34, 0.42);
+}
+
+/* ── Profile Goals ───────────────────────────────────────────────── */
+.profile-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-field {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(31, 71, 81, 0.05);
+  border-radius: 14px;
+}
+
+.goal-field__value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.goal-field__value strong {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--mind);
+}
+
+.goal-field__value span {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(74, 44, 34, 0.55);
+}
+
+/* ── Cycle Phase Banner ──────────────────────────────────────────── */
+.cycle-phase-banner {
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--phase-color) 10%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--phase-color) 28%, transparent);
+  display: grid;
+  gap: 10px;
+}
+
+.cycle-phase-banner__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cycle-phase-banner__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--phase-color);
+  flex-shrink: 0;
+}
+
+.cycle-phase-banner__tips {
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.cycle-phase-banner__tips li {
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--phase-color) 60%, var(--chocolate));
+}
+
+/* ── Sleep History Chart ─────────────────────────────────────────── */
+.sleep-history-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+}
+
+.sleep-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sleep-bar-track {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  background: rgba(31, 71, 81, 0.07);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sleep-bar-track::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--goal-pct);
+  height: 1px;
+  background: rgba(31, 71, 81, 0.25);
+  pointer-events: none;
+}
+
+.sleep-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--mind);
+  border-radius: 6px;
+  transition: height 0.4s ease;
+  opacity: 0.7;
+}
+
+.sleep-bar-fill--under { background: var(--body); opacity: 0.65; }
+.sleep-bar-fill--today { opacity: 1; }
+
+.sleep-bar-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(74, 44, 34, 0.5);
+}
+
+.sleep-bar-value {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(74, 44, 34, 0.7);
+  white-space: nowrap;
+}
+
+.sleep-history-avg {
+  margin: 8px 0 0;
+  font-size: var(--fs-caption);
+  color: rgba(74, 44, 34, 0.55);
+  text-align: center;
 }
 
 .ritual-score {

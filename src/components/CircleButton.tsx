@@ -1,9 +1,11 @@
+import type { MouseEventHandler } from 'react';
+
 type Props = {
   size?: number;
   color?: string;
   ariaLabel?: string;
   variant?: 'auto' | 'close';
-  onClick?: () => void;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
 };
 
 export default function CircleButton({ size = 22, color = 'currentColor', ariaLabel, variant = 'auto', onClick }: Props) {

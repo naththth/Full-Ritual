@@ -129,7 +129,7 @@
   /* ---------- LAYOUT MOBILE ---------- */
   --nav-h:        82px;
   --safe-bottom:  env(safe-area-inset-bottom, 0px);
-  --system-bottom-gap: max(var(--safe-bottom), 18px);
+  --system-bottom-gap: var(--safe-bottom);
   --safe-top:     env(safe-area-inset-top, 0px);
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import CircleButton from '../components/CircleButton';
 import { Ring } from '../components/Ring';
-import { buildAutomaticCorrelations, type CorrelationInsight } from '../lib/correlations';
-import { lastDays, minutesToSleepLabel } from '../lib/dates';
+import { buildAutomaticCorrelations, correlationsToText, type CorrelationInsight } from '../lib/correlations';
+import { isoToday, lastDays, minutesToSleepLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { DIMENSIONS, type Checkin, type DailyScore, type DimensionKey, type Insight as InsightRow, type SleepLog } from '../types';
 import { useApp } from '../store/useStore';
@@ -10,17 +11,19 @@ import { useApp } from '../store/useStore';
 export function Insight() {
   const goTo = useApp((s) => s.goTo);
   const userId = useApp((s) => s.userId);
+  const showToast = useApp((s) => s.showToast);
   const [insights, setInsights] = useState<InsightRow[]>([]);
   const [scores, setScores] = useState<DailyScore[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [checkins, setCheckins] = useState<Checkin[]>([]);
+  const [generatingAi, setGeneratingAi] = useState(false);
 
   useEffect(() => {
     if (!hasSupabase || !userId) return;
-    const since = lastDays(7)[0];
+    const since = lastDays(14)[0];
 
     void Promise.all([
-      supabase.from('insights').select('*').order('date', { ascending: false }).limit(4),
+      supabase.from('insights').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(6),
       supabase.from('daily_scores').select('*').gte('date', since).order('date', { ascending: true }),
       supabase.from('sleep_logs').select('*').gte('date', since).order('date', { ascending: true }),
       supabase.from('checkins').select('*').gte('date', since).order('date', { ascending: true }),
@@ -36,10 +39,58 @@ export function Insight() {
     });
   }, [userId]);
 
+  const generateAiInsight = async () => {
+    if (!hasSupabase || !userId || generatingAi) return;
+    setGeneratingAi(true);
+    try {
+      const currentScores = scores.length ? scores : makeWeekScores(userId);
+      const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: currentScores });
+      const context = [
+        `Data: ${isoToday()}`,
+        `Sono médio 14 dias: ${avgSleep ? minutesToSleepLabel(avgSleep) : 'sem dados'}`,
+        `Correlações detectadas:\n${correlationsToText(correlations)}`,
+        `Scores médios: pele ${avgScore(scores, 'score_skin')} | corpo ${avgScore(scores, 'score_body')} | mente ${avgScore(scores, 'score_mind')} | dieta ${avgScore(scores, 'score_diet')} | espírito ${avgScore(scores, 'score_spirit')}`,
+      ].join('\n');
+
+      const { data, error } = await supabase.functions.invoke('gemini-chat', {
+        body: {
+          message: 'Gere um insight semanal personalizado baseado nos dados da usuária. Seja direta, específica, com no máximo 3 frases. Foque no padrão mais forte.',
+          context: { recent_summary: context },
+          userId,
+          saveInsight: true,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      if (data?.reply) {
+        const newInsight: InsightRow = {
+          id: data.insight?.id ?? crypto.randomUUID(),
+          user_id: userId,
+          date: isoToday(),
+          type: 'weekly',
+          title: data.insight?.title ?? 'Insight da semana',
+          body: data.reply,
+          correlations: data.insight?.correlations ?? null,
+          source: 'gemini',
+          created_at: data.insight?.created_at ?? new Date().toISOString(),
+        };
+        setInsights((current) => [newInsight, ...current]);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('não foi possível gerar o insight agora.');
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
   const fallbackScores = useMemo(() => makeWeekScores(userId ?? 'local'), [userId]);
   const visibleScores = scores.length ? scores : fallbackScores;
   const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: visibleScores });
   const primaryInsight = insights[0] ?? fallbackInsight(correlations[0]);
+  const aiHistory = insights
+    .filter((insight) => insight.source === 'gemini')
+    .slice(0, 5);
   const avgSleep = sleepLogs.length
     ? Math.round(sleepLogs.reduce((sum, log) => sum + (log.duration_min ?? 0), 0) / sleepLogs.length)
     : 372;
@@ -114,8 +165,18 @@ export function Insight() {
       </section>
 
       <section className="stack">
-        <span className="eyebrow">correlações</span>
-        {correlations.slice(0, 3).map((correlation) => (
+        <div className="row-between">
+          <span className="eyebrow">correlações</span>
+          <button
+            className="chip"
+            onClick={() => void generateAiInsight()}
+            disabled={generatingAi}
+            aria-busy={generatingAi}
+          >
+            {generatingAi ? 'gerando...' : '✦ gerar com IA'}
+          </button>
+        </div>
+        {correlations.slice(0, 4).map((correlation) => (
           <article key={correlation.title} className="card stack">
             <div className="row-between">
               <strong>{correlation.title}</strong>
@@ -135,6 +196,38 @@ export function Insight() {
           abrir conversa
         </span>
       </button>
+
+      {aiHistory.length > 0 && (
+        <details className="card stack insight-history">
+          <summary>
+            <span>
+              <span className="eyebrow">insights da IA · histórico</span>
+              <strong>{aiHistory.length} leitura{aiHistory.length > 1 ? 's' : ''} anterior{aiHistory.length > 1 ? 'es' : ''}</strong>
+            </span>
+            <CircleButton
+              ariaLabel="Abrir histórico de insights"
+              color="var(--spirit)"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const details = event.currentTarget.closest('details');
+                if (details) details.open = !details.open;
+              }}
+            />
+          </summary>
+          <div className="stack">
+            {aiHistory.map((insight) => (
+              <article key={insight.id} className="insight-history__item">
+                <div className="row-between">
+                  <strong>{insight.title}</strong>
+                  <span className="chip">{new Date(insight.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                </div>
+                <p className="t-body-sm muted">{insight.body}</p>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -162,6 +255,12 @@ function fallbackInsight(correlation: CorrelationInsight): InsightRow {
     source: 'rule',
     created_at: new Date().toISOString(),
   };
+}
+
+function avgScore(scores: DailyScore[], key: keyof DailyScore): string {
+  const vals = scores.map((s) => s[key]).filter((v): v is number => typeof v === 'number');
+  if (!vals.length) return '—';
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) + '%';
 }
 
 function makeWeekScores(userId: string): DailyScore[] {

@@ -113,8 +113,67 @@ export function Evolution() {
           </article>
         ))}
       </section>
+
+      <section className="card stack">
+        <span className="eyebrow">exportar · dados</span>
+        <p className="t-body-sm muted">CSV com sono, energia, scores e ciclo dos últimos 30 dias. Útil para compartilhar com médico, nutri ou personal.</p>
+        <button
+          className="btn btn--secondary btn--full"
+          onClick={() => exportCsv({ scores: chartScores, sleepLogs, checkins })}
+          disabled={chartScores.length === 0}
+        >
+          baixar CSV (30 dias)
+        </button>
+      </section>
     </div>
   );
+}
+
+function exportCsv({
+  scores,
+  sleepLogs,
+  checkins,
+}: {
+  scores: DailyScore[];
+  sleepLogs: SleepLog[];
+  checkins: Checkin[];
+}) {
+  const sleepByDate = new Map(sleepLogs.map((l) => [l.date, l]));
+  const checkinByDate = new Map(checkins.map((c) => [c.date, c]));
+
+  const headers = [
+    'data', 'sono_h', 'qualidade_sono', 'energia', 'calma',
+    'score_pele', 'score_corpo', 'score_mente', 'score_dieta', 'score_espirito', 'sinais',
+  ];
+
+  const rows = scores.map((s) => {
+    const sleep = sleepByDate.get(s.date);
+    const checkin = checkinByDate.get(s.date);
+    return [
+      s.date,
+      sleep?.duration_min != null ? (sleep.duration_min / 60).toFixed(1) : '',
+      sleep?.quality ?? '',
+      checkin?.energy ?? '',
+      checkin?.calm ?? '',
+      s.score_skin,
+      s.score_body,
+      s.score_mind,
+      s.score_diet,
+      s.score_spirit,
+      (checkin?.signals ?? []).join('|'),
+    ].join(',');
+  });
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `full-ritual-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function totalScore(score: DailyScore) {

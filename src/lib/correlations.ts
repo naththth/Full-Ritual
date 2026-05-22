@@ -17,65 +17,147 @@ export function buildAutomaticCorrelations({
 }): CorrelationInsight[] {
   const insights: CorrelationInsight[] = [];
 
-  const sleepByDate = new Map(sleepLogs.map((sleep) => [sleep.date, sleep]));
-  const checkinsWithSleep = checkins.filter((checkin) => sleepByDate.get(checkin.date)?.duration_min);
-  const shortSleepSkin = checkinsWithSleep.filter((checkin) => {
-    const sleep = sleepByDate.get(checkin.date);
-    return (sleep?.duration_min ?? 0) < 360 && checkin.skin_state <= 5;
-  });
+  const sleepByDate = new Map(sleepLogs.map((s) => [s.date, s]));
+  const checkinsWithSleep = checkins.filter((c) => sleepByDate.get(c.date)?.duration_min);
 
-  if (checkinsWithSleep.length >= 2) {
+  // Sono < 6h → pele reativa
+  if (checkinsWithSleep.length >= 3) {
+    const shortSleepSkin = checkinsWithSleep.filter((c) => {
+      const sleep = sleepByDate.get(c.date);
+      return (sleep?.duration_min ?? 0) < 360 && c.skin_state <= 5;
+    });
     const strength = shortSleepSkin.length / checkinsWithSleep.length;
     insights.push({
       title: 'Sono e pele',
       body:
         strength >= 0.45
-          ? 'Quando o sono fica abaixo de seis horas, a pele aparece mais reativa nos registros. Hoje vale priorizar barreira, água e menos ativos.'
-          : 'Seu sono ainda não formou um padrão forte com a pele. Continue registrando duração e estado da pele para a leitura ficar mais precisa.',
+          ? `Em ${Math.round(strength * 100)}% das noites com menos de 6h, a pele apareceu mais reativa. Barreira e hidratação têm mais ROI nesses dias.`
+          : 'Seu sono ainda não formou padrão forte com a pele. Continue registrando para a leitura ficar mais precisa.',
       strength,
     });
   }
 
-  const mindScores = scores.filter((score) => score.score_mind > 0);
-  if (mindScores.length >= 5) {
-    const avgMind = average(mindScores.map((score) => score.score_mind));
-    const avgBody = average(mindScores.map((score) => score.score_body));
+  // Sono < 6h → energia baixa no dia seguinte
+  if (checkinsWithSleep.length >= 3) {
+    const shortSleepEnergy = checkinsWithSleep.filter((c) => {
+      const sleep = sleepByDate.get(c.date);
+      return (sleep?.duration_min ?? 0) < 390 && c.energy <= 5;
+    });
+    const strength = shortSleepEnergy.length / checkinsWithSleep.length;
+    if (strength >= 0.35) {
+      insights.push({
+        title: 'Sono e energia',
+        body: `Noites abaixo de 6h30 coincidem com energia ≤5 em ${Math.round(strength * 100)}% dos registros. Sono é o lever mais direto de energia.`,
+        strength,
+      });
+    }
+  }
+
+  // Sono < 6h → calma baixa
+  if (checkinsWithSleep.length >= 3) {
+    const shortSleepCalm = checkinsWithSleep.filter((c) => {
+      const sleep = sleepByDate.get(c.date);
+      return (sleep?.duration_min ?? 0) < 390 && c.calm <= 4;
+    });
+    const strength = shortSleepCalm.length / checkinsWithSleep.length;
+    if (strength >= 0.35) {
+      insights.push({
+        title: 'Sono e calma',
+        body: `${Math.round(strength * 100)}% das noites curtas aparecem com calma baixa no dia seguinte. Ansiedade leve pode ser fisiológica, não só emocional.`,
+        strength,
+      });
+    }
+  }
+
+  // Desequilíbrio corpo/mente
+  const activeDays = scores.filter((s) => s.score_mind > 0 && s.score_body > 0);
+  if (activeDays.length >= 5) {
+    const avgMind = average(activeDays.map((s) => s.score_mind));
+    const avgBody = average(activeDays.map((s) => s.score_body));
+    const diff = avgBody - avgMind;
     insights.push({
-      title: 'Treino e calma',
+      title: 'Treino e mente',
       body:
-        avgBody > avgMind + 12
-          ? 'O corpo está recebendo mais presença que a mente. Uma pausa curta depois do treino ajuda o sistema a entender que terminou.'
-          : 'Corpo e mente estão relativamente próximos. Esse equilíbrio é uma boa base para ajustar sono e dieta sem excesso.',
-      strength: Math.min(1, Math.abs(avgBody - avgMind) / 50),
+        diff > 15
+          ? `O corpo está ${Math.round(diff)}pts à frente da mente na semana. Uma pausa ativa ou prática contemplativa fecha essa brecha.`
+          : diff < -15
+            ? `A mente está ${Math.round(Math.abs(diff))}pts à frente do corpo. Considere aumentar movimento ou intensidade do treino.`
+            : 'Corpo e mente estão equilibrados. Isso é base sólida para ajustar sono e dieta sem sobrecarga.',
+      strength: Math.min(1, Math.abs(diff) / 40),
     });
   }
 
-  const dietScores = scores.filter((score) => score.score_diet > 0);
-  if (dietScores.length >= 5) {
-    const avgDiet = average(dietScores.map((score) => score.score_diet));
+  // Dieta irregular
+  const dietDays = scores.filter((s) => s.score_diet > 0);
+  if (dietDays.length >= 5) {
+    const avgDiet = average(dietDays.map((s) => s.score_diet));
+    const dietVariance = variance(dietDays.map((s) => s.score_diet));
     insights.push({
-      title: 'Dieta e energia',
+      title: 'Consistência da dieta',
       body:
-        avgDiet < 55
-          ? 'A alimentação está ficando irregular no histórico. Registrar foto e refeição principal já melhora a leitura de energia.'
-          : 'A dieta está sustentando o ritual. As fotos de refeição vão ajudar a IA a perceber variações de humor e saciedade.',
+        avgDiet < 50
+          ? 'Alimentação irregular no histórico. Registrar pelo menos a refeição principal já muda a leitura de energia.'
+          : dietVariance > 400
+            ? 'Dieta tem alta variação dia a dia. Padrão mais estável no café da manhã tende a estabilizar o resto.'
+            : 'Dieta sustentando o ritual. As fotos de refeição ajudam a IA a capturar qualidade além de quantidade.',
       strength: avgDiet / 100,
     });
+  }
+
+  // Energia consistente alta
+  const energyDays = checkins.filter((c) => c.energy >= 7);
+  if (energyDays.length >= 4 && checkins.length >= 5) {
+    const rate = energyDays.length / checkins.length;
+    insights.push({
+      title: 'Energia sustentada',
+      body:
+        rate >= 0.7
+          ? `Energia ≥7 em ${Math.round(rate * 100)}% dos dias registrados. O que está funcionando merece manutenção, não mudança.`
+          : `Energia alta em ${Math.round(rate * 100)}% dos dias. Analise o que diferencia os dias bons dos fracos.`,
+      strength: rate,
+    });
+  }
+
+  // Espírito alto → energia alta no mesmo dia
+  const spiritAndEnergy = scores.filter((s) => s.score_spirit > 70);
+  const matchingCheckins = spiritAndEnergy.map((s) => checkins.find((c) => c.date === s.date)).filter(Boolean);
+  if (matchingCheckins.length >= 3) {
+    const highEnergy = matchingCheckins.filter((c) => (c?.energy ?? 0) >= 7);
+    const strength = highEnergy.length / matchingCheckins.length;
+    if (strength >= 0.55) {
+      insights.push({
+        title: 'Espírito e energia',
+        body: `Dias com ritual espiritual completo coincidem com energia alta em ${Math.round(strength * 100)}% dos registros. Intenção e presença têm retorno físico.`,
+        strength,
+      });
+    }
   }
 
   if (!insights.length) {
     insights.push({
       title: 'Primeira leitura',
-      body: 'Registre sono, pele, treino e refeições por alguns dias. As correlações aparecem melhor quando o ritual deixa rastro.',
+      body: 'Registre sono, pele, treino e refeições por alguns dias. As correlações aparecem quando o ritual deixa rastro.',
       strength: 0.2,
     });
   }
 
-  return insights;
+  return insights.sort((a, b) => b.strength - a.strength);
+}
+
+/** Resumo em texto das correlações, para enviar ao Gemini como contexto. */
+export function correlationsToText(correlations: CorrelationInsight[]): string {
+  return correlations
+    .map((c) => `- ${c.title} (força ${Math.round(c.strength * 100)}%): ${c.body}`)
+    .join('\n');
 }
 
 function average(values: number[]) {
-  const valid = values.filter((value) => Number.isFinite(value));
+  const valid = values.filter((v) => Number.isFinite(v));
   if (!valid.length) return 0;
-  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+  return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+}
+
+function variance(values: number[]) {
+  const avg = average(values);
+  return average(values.map((v) => (v - avg) ** 2));
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BackButton } from '../components/BackButton';
+import { CyclePhaseBanner } from '../components/CyclePhaseBanner';
+import { isoToday } from '../lib/dates';
 import { useApp } from '../store/useStore';
 import {
   type BodyCoachMessage,
@@ -94,6 +96,8 @@ export function BodyCoach() {
           Triatlo, força, periodização. Pergunte, ajuste, justifique. Histórico fica salvo.
         </p>
       </header>
+
+      <CyclePhaseBanner context="body" date={isoToday()} />
 
       <section ref={threadRef} className="chat-thread" aria-live="polite">
         {loadingHistory && <article className="bubble bubble--ai body-coach-bubble">carregando histórico...</article>}

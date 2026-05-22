@@ -4,6 +4,7 @@ import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
 import { isoToday } from '../lib/dates';
 import { useApp } from '../store/useStore';
+import { CyclePhaseBanner } from '../components/CyclePhaseBanner';
 import { exerciseKey, exerciseTakesLoad, fetchWorkoutLoad, upsertWorkoutLoad } from '../lib/strengthLoads';
 import {
   INTENSITY_LABEL,
@@ -1105,6 +1106,8 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
             : `${profile.modalities.map((m) => MODALITY_LABEL[m]).join(' · ')} · ${profile.available_days.length} dias`}
         </p>
       </section>
+
+      <CyclePhaseBanner context="body" date={todayIso} />
 
       <section className="stack training-exercise-section">
         <span className="eyebrow">exercício · toque para abrir</span>

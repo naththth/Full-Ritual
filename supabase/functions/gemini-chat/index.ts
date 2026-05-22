@@ -29,10 +29,11 @@ const corsHeaders = {
 
 interface ReqBody {
   message: string;
-  context?: {
+  context?: string | {
     recent_summary?: string;
     focus_dimension?: string;
   };
+  saveInsight?: boolean;
 }
 
 // @ts-expect-error Deno.serve
@@ -56,8 +57,9 @@ Deno.serve(async (req: Request) => {
     if (!user) return json({ error: 'usuário inválido' }, 401);
 
     // 2. Body
-    const { message, context = {} } = (await req.json()) as ReqBody;
+    const { message, context: rawContext = {}, saveInsight = false } = (await req.json()) as ReqBody;
     if (!message) return json({ error: 'mensagem ausente' }, 400);
+    const context = normalizeContext(rawContext);
 
     // 3. Busca contexto recente do usuário (com RLS, vê só o dele)
     const today = new Date().toISOString().slice(0, 10);
@@ -133,7 +135,31 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    return json({ reply }, 200);
+    let savedInsight = null;
+    if (saveInsight) {
+      const title = 'Insight da semana';
+      const { data: insertedInsight, error: insightError } = await supabase
+        .from('insights')
+        .insert({
+          user_id: user.id,
+          date: today,
+          type: 'weekly',
+          title,
+          body: reply,
+          correlations: null,
+          source: 'gemini',
+        })
+        .select('*')
+        .single();
+
+      if (insightError) {
+        console.warn('Insight save error:', insightError);
+      } else {
+        savedInsight = insertedInsight;
+      }
+    }
+
+    return json({ reply, insight: savedInsight }, 200);
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
       return json({ error: 'tempo esgotado ao consultar a IA' }, 504);
@@ -160,6 +186,11 @@ function extractText(candidate: any): string {
     .filter(Boolean)
     .join('\n')
     .trim();
+}
+
+function normalizeContext(context: ReqBody['context']): { recent_summary?: string; focus_dimension?: string } {
+  if (typeof context === 'string') return { recent_summary: context };
+  return context ?? {};
 }
 
 function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, extra }: {

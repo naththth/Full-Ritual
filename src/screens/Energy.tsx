@@ -1,7 +1,7 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { PresenceSlider } from '../components/PresenceSlider';
 import { cycleInfo } from '../lib/cycle';
-import { addDays, dateFromIso, diffMinutes, isoToday, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
+import { addDays, dateFromIso, diffMinutes, isoToday, lastDays, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
@@ -100,6 +100,8 @@ export function Energy() {
   const [sleepQuality, setSleepQuality] = useState(7);
   const [sleepNotes, setSleepNotes] = useState('');
   const [activeCycleDate, setActiveCycleDate] = useState(selectedDate);
+  const [sleepHistory, setSleepHistory] = useState<SleepLog[]>([]);
+  const sleepInitialized = useRef(false);
 
   const duration = diffMinutes(bedtime, wakeTime);
   const dateLabel = relativeDateLabel(selectedDate);
@@ -124,6 +126,46 @@ export function Energy() {
   useEffect(() => {
     setActiveCycleDate(selectedDate);
   }, [selectedDate]);
+
+  // Load 14 days of sleep history from Supabase
+  useEffect(() => {
+    if (!hasSupabase || !userId) return;
+    const since = isoToday(addDays(new Date(), -13));
+    supabase
+      .from('sleep_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('date', since)
+      .order('date', { ascending: true })
+      .then(({ data }) => {
+        if (!data) return;
+        setSleepHistory(data as SleepLog[]);
+        setSleepLogs((current) => {
+          const merged = [...current];
+          for (const log of data as SleepLog[]) {
+            if (!merged.some((l) => l.date === log.date)) merged.push(log);
+          }
+          return merged;
+        });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Pre-populate form when selected date already has a sleep log
+  useEffect(() => {
+    sleepInitialized.current = false;
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (sleepInitialized.current) return;
+    const existing = sleepHistory.find((l) => l.date === selectedDate) ?? currentSleep;
+    if (!existing) return;
+    sleepInitialized.current = true;
+    if (existing.bedtime) setBedtime(existing.bedtime.slice(11, 16));
+    if (existing.wake_time) setWakeTime(existing.wake_time.slice(11, 16));
+    if (existing.quality != null) setSleepQuality(existing.quality);
+    if (existing.notes) setSleepNotes(existing.notes);
+  }, [sleepHistory, selectedDate, currentSleep]);
 
   useEffect(() => {
     const profileCycleStart = profile?.cycle_start;
@@ -332,6 +374,10 @@ export function Energy() {
         <textarea className="field" placeholder="despertares, tela, treino, álcool, sonhos..." value={sleepNotes} onChange={(event) => setSleepNotes(event.target.value)} />
       </section>
 
+      {sleepHistory.length > 1 && (
+        <SleepHistoryChart logs={sleepHistory} selectedDate={selectedDate} />
+      )}
+
       <section className="card stack energy-cycle-card">
         <div className="row-between">
           <span className="eyebrow">ciclo menstrual</span>
@@ -395,6 +441,62 @@ export function Energy() {
         </div>
       </section>
     </div>
+  );
+}
+
+const SLEEP_GOAL_MIN = 480; // 8h
+
+function SleepHistoryChart({ logs, selectedDate }: { logs: SleepLog[]; selectedDate: string }) {
+  const days = lastDays(7);
+  const mapped = days.map((date) => {
+    const log = logs.find((l) => l.date === date);
+    return { date, min: log?.duration_min ?? null, quality: log?.quality ?? null };
+  });
+
+  const maxMin = Math.max(SLEEP_GOAL_MIN, ...mapped.map((d) => d.min ?? 0));
+  const debt = mapped.reduce((acc, d) => {
+    if (d.min == null) return acc;
+    return acc + Math.max(0, SLEEP_GOAL_MIN - d.min);
+  }, 0);
+  const debtH = Math.round(debt / 60);
+  const avg = mapped.filter((d) => d.min != null);
+  const avgMin = avg.length ? Math.round(avg.reduce((a, d) => a + (d.min ?? 0), 0) / avg.length) : null;
+  const DAYS_PT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+  return (
+    <section className="card stack">
+      <div className="row-between">
+        <span className="eyebrow">histórico de sono · 7 noites</span>
+        <span className="eyebrow" style={{ color: debtH > 3 ? 'var(--body)' : 'var(--diet)' }}>
+          {debtH > 0 ? `débito ${debtH}h` : 'em dia ✓'}
+        </span>
+      </div>
+      <div className="sleep-history-chart">
+        {mapped.map((d) => {
+          const pct = d.min != null ? Math.min((d.min / maxMin) * 100, 100) : 0;
+          const goalPct = (SLEEP_GOAL_MIN / maxMin) * 100;
+          const isToday = d.date === selectedDate;
+          const isUnder = d.min != null && d.min < SLEEP_GOAL_MIN;
+          const label = DAYS_PT[dateFromIso(d.date).getDay()];
+          return (
+            <div key={d.date} className="sleep-bar-col">
+              <div className="sleep-bar-track" style={{ '--goal-pct': `${goalPct}%` } as CSSProperties}>
+                <div
+                  className={`sleep-bar-fill ${isUnder ? 'sleep-bar-fill--under' : ''} ${isToday ? 'sleep-bar-fill--today' : ''}`}
+                  style={{ height: d.min != null ? `${pct}%` : '0%' }}
+                  title={d.min != null ? minutesToSleepLabel(d.min) : '—'}
+                />
+              </div>
+              <span className="sleep-bar-label">{label}</span>
+              <span className="sleep-bar-value">{d.min != null ? minutesToSleepLabel(d.min) : '—'}</span>
+            </div>
+          );
+        })}
+      </div>
+      {avgMin != null && (
+        <p className="sleep-history-avg">média semanal · <strong>{minutesToSleepLabel(avgMin)}</strong></p>
+      )}
+    </section>
   );
 }
 

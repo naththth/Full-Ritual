@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import CircleButton from '../components/CircleButton';
+import { CyclePhaseBanner } from '../components/CyclePhaseBanner';
 import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
@@ -170,6 +171,8 @@ export function Diet() {
           Plano do dia com substituições, água e foto da refeição.
         </p>
       </header>
+
+      <CyclePhaseBanner context="diet" date={selectedDate} />
 
       {generalAiAdditions.length > 0 && (
         <section className="diet-ai-card stack">
