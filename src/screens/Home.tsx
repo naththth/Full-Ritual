@@ -3,6 +3,7 @@ import { Icon3D } from '../components/Icon3D';
 import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, isoToday, lastDays, relativeDateLabel, weekDaysAround } from '../lib/dates';
+import { resolveInsightText } from '../lib/insightText';
 import { readJson } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { type DailyScore, type DimensionKey, type Insight } from '../types';
@@ -108,6 +109,7 @@ const FALLBACK_WEATHER_COORDS = {
 
 export function Home() {
   const profile = useApp((s) => s.profile);
+  const sexo = useApp((s) => s.sexo);
   const userId = useApp((s) => s.userId);
   const goTo = useApp((s) => s.goTo);
   const selectedDate = useApp((s) => s.selectedDate);
@@ -163,8 +165,8 @@ export function Home() {
   const energyLabel = energyValue !== null ? `${energyValue}/10` : '—';
 
   const dailyInsight = useMemo(
-    () => buildDailyInsight(sleepMin, cycle, latestInsight),
-    [sleepMin, cycle, latestInsight],
+    () => buildDailyInsight(sleepMin, profile?.cycle_tracking && sexo !== 'masculino' ? cycle : null, latestInsight, profile?.name),
+    [sleepMin, cycle, latestInsight, profile?.name, profile?.cycle_tracking, sexo],
   );
 
   const openDimension = (key: DimensionKey) => {
@@ -275,14 +277,6 @@ export function Home() {
       <header className="stack" style={{ paddingTop: 8 }}>
         <div className="row-between">
           <span className="eyebrow">{dateLabel}</span>
-          <button
-            onClick={() => goTo('profile')}
-            aria-label="Perfil"
-            className="home-avatar-btn"
-            style={profile?.photo_url ? { background: `url(${profile.photo_url}) center/cover` } : undefined}
-          >
-            {!profile?.photo_url && (profile?.name?.[0] ?? 'N')}
-          </button>
         </div>
 
         <h1 className="t-display-lg" style={{ marginTop: 8 }}>
@@ -317,10 +311,12 @@ export function Home() {
             <strong>{sleepLabel}</strong>
             <span>sono</span>
           </button>
-          <button onClick={() => goTo('energy')}>
-            <strong>dia {cycle.day}</strong>
-            <span>{phaseLabel(cycle.phase)}</span>
-          </button>
+          {profile?.cycle_tracking && sexo !== 'masculino' && (
+            <button onClick={() => goTo('energy')}>
+              <strong>dia {cycle.day}</strong>
+              <span>{phaseLabel(cycle.phase)}</span>
+            </button>
+          )}
           <button onClick={() => goTo('energy')}>
             <strong>{energyLabel}</strong>
             <span>energia</span>
@@ -353,40 +349,44 @@ export function Home() {
       />
 
       <section className="stack">
-        <span className="eyebrow">saúde · acessar</span>
+        <span className="eyebrow">HUB de Saúde</span>
         <div className="home-health-card">
-          <button className="home-health-pill" onClick={() => goTo('labs')}>
+          <button type="button" className="home-health-pill" onClick={() => goTo('labs')}>
             <Icon3D kind="labs" size={36} />
             <div className="home-health-pill-text">
               <strong>Exames</strong>
               <span>laudos e marcadores</span>
             </div>
           </button>
-          <button className="home-health-pill" onClick={() => goTo('supplements')}>
+          <button type="button" className="home-health-pill" onClick={() => goTo('supplements')}>
             <Icon3D kind="supplements" size={36} />
             <div className="home-health-pill-text">
               <strong>Suplementos</strong>
               <span>aderência diária</span>
             </div>
           </button>
-          <button className="home-health-pill" onClick={() => goTo('vitals')}>
-            <Icon3D kind="vitals" size={36} />
-            <div className="home-health-pill-text">
-              <strong>Sinais vitais</strong>
-              <span>FC, HRV, passos</span>
-            </div>
-          </button>
-          <button className="home-health-pill" onClick={() => goTo('pain')}>
+          <button type="button" className="home-health-pill" onClick={() => goTo('pain')}>
             <Icon3D kind="pain" size={36} />
             <div className="home-health-pill-text">
               <strong>Dor e lesões</strong>
               <span>registro e evolução</span>
             </div>
           </button>
+          <button type="button" className="home-health-pill" onClick={() => goTo('body_metrics')}>
+            <Icon3D kind="body" size={36} />
+            <div className="home-health-pill-text">
+              <strong>Peso</strong>
+              <span>peso e medidas</span>
+            </div>
+          </button>
+          <button type="button" className="home-health-pill home-health-overview" onClick={() => goTo('health')}>
+            <Icon3D kind="health" size={36} />
+            <div className="home-health-pill-text">
+              <strong>Visão geral</strong>
+              <span>resumo do HUB <span aria-hidden="true">→</span></span>
+            </div>
+          </button>
         </div>
-        <button className="btn btn--secondary btn--sm" style={{ alignSelf: 'flex-end' }} onClick={() => goTo('health')}>
-          visão geral →
-        </button>
       </section>
 
       <button className="card home-ai-card" onClick={() => goTo('chat')}>
@@ -858,12 +858,14 @@ function phaseLabel(phase: string) {
 
 function buildDailyInsight(
   sleepMin: number | null,
-  cycle: { phase: string; day: number },
+  cycle: { phase: string; day: number } | null,
   fallback: { title: string; body: string } | null,
+  profileName?: string | null,
 ): { title: string; body: string } {
   const shortSleep = sleepMin !== null && sleepMin < 360;
   const goodSleep = sleepMin !== null && sleepMin >= 420;
-  const { phase, day } = cycle;
+  const phase = cycle?.phase;
+  const day = cycle?.day;
 
   if (phase === 'menstrual' && shortSleep) return {
     title: 'Recuperação dupla: fase e sono curto.',
@@ -899,6 +901,6 @@ function buildDailyInsight(
   };
   return {
     title: fallback?.title ?? 'Presença primeiro, performance depois.',
-    body: fallback?.body ?? 'Use os dados do dia para ajustar — não para cobrar.',
+    body: fallback?.body ? resolveInsightText(fallback.body, profileName) : 'Use os dados do dia para ajustar — não para cobrar.',
   };
 }

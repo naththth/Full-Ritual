@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { BackButton } from '../components/BackButton';
 import {
   PRODUCT_CATEGORIES,
   PRODUCT_FREQUENCIES,
@@ -249,8 +248,7 @@ export function Products() {
   if (editingSource) {
     return (
       <div className="screen stack-md">
-        <header className="screen-header stack">
-          <BackButton onClick={resetDraft} />
+        <header className="stack">
           <span className="eyebrow">produto · editar</span>
           <h1 className="t-display-lg">
             Ajustar <em className="t-display-italic">produto.</em>
@@ -277,8 +275,7 @@ export function Products() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">produtos · skincare</span>
         <h1 className="t-display-lg">
           Prateleira que <em className="t-display-italic">vira rotina.</em>

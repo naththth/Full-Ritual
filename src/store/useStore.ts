@@ -15,6 +15,7 @@ export type Screen =
   | 'insight'
   | 'dimension'
   | 'profile'
+  | 'onboarding'
   | 'products'
   | 'library'
   | 'evolution'
@@ -23,7 +24,6 @@ export type Screen =
   | 'body_metrics'
   | 'labs'
   | 'supplements'
-  | 'vitals'
   | 'pain'
   | 'health';
 
@@ -38,6 +38,10 @@ interface AppState {
   profile: Profile | null;
   setProfile: (p: Profile | null) => void;
   setUser: (id: string | null) => void;
+  activeDimensions: DimensionKey[];
+  setActiveDimensions: (dims: DimensionKey[]) => void;
+  sexo: 'masculino' | 'feminino' | 'outro' | null;
+  setSexo: (s: 'masculino' | 'feminino' | 'outro' | null) => void;
 
   // Navegação
   screen: Screen;
@@ -72,6 +76,10 @@ export const useApp = create<AppState>()(
       profile: null,
       setProfile: (profile) => set({ profile }),
       setUser: (userId) => set({ userId }),
+      activeDimensions: ['skin', 'body', 'mind', 'diet', 'spirit'],
+      setActiveDimensions: (activeDimensions) => set({ activeDimensions }),
+      sexo: null,
+      setSexo: (sexo) => set({ sexo }),
 
       screen: 'home',
       focusedDimension: undefined,

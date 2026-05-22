@@ -83,6 +83,7 @@ export function Energy() {
   const profile = useApp((s) => s.profile);
   const setProfile = useApp((s) => s.setProfile);
   const showToast = useApp((s) => s.showToast);
+  const sexo = useApp((s) => s.sexo);
 
   const previousDate = isoToday(addDays(dateFromIso(selectedDate), -1));
   const [rawCheckin, setCheckin] = useLocalState<EnergyCheckin>(`full-ritual-energy-${selectedDate}`, initialCheckin());
@@ -312,7 +313,7 @@ export function Energy() {
       <section className="metric-grid">
         <Metric label="energia" value={`${checkin.energy}/10`} />
         <Metric label="sono" value={currentSleep?.duration_min ? minutesToSleepLabel(currentSleep.duration_min) : minutesToSleepLabel(duration)} />
-        <Metric label="ciclo" value={todayCycle ? `D${todayCycle.day}` : '—'} />
+        {cyclePrefs.tracking && sexo !== 'masculino' && <Metric label="ciclo" value={todayCycle ? `D${todayCycle.day}` : '—'} />}
       </section>
 
       <section className="card stack">
@@ -376,7 +377,7 @@ export function Energy() {
         <SleepHistoryChart logs={sleepHistory} selectedDate={selectedDate} />
       )}
 
-      <section className="card stack energy-cycle-card">
+      {cyclePrefs.tracking && sexo !== 'masculino' && <section className="card stack energy-cycle-card">
         <div className="row-between">
           <span className="eyebrow">ciclo menstrual</span>
           {activeCycle && (
@@ -437,7 +438,7 @@ export function Energy() {
             </button>
           ))}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import CircleButton from '../components/CircleButton';
 import { Ring } from '../components/Ring';
 import { buildAutomaticCorrelations, correlationsToText, type CorrelationInsight } from '../lib/correlations';
 import { isoToday, lastDays, minutesToSleepLabel } from '../lib/dates';
+import { resolveInsightText } from '../lib/insightText';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { DIMENSIONS, type Checkin, type DailyScore, type DimensionKey, type Insight as InsightRow, type SleepLog } from '../types';
 import { useApp } from '../store/useStore';
@@ -11,6 +12,7 @@ import { useApp } from '../store/useStore';
 export function Insight() {
   const goTo = useApp((s) => s.goTo);
   const userId = useApp((s) => s.userId);
+  const profile = useApp((s) => s.profile);
   const showToast = useApp((s) => s.showToast);
   const [insights, setInsights] = useState<InsightRow[]>([]);
   const [scores, setScores] = useState<DailyScore[]>([]);
@@ -69,7 +71,7 @@ export function Insight() {
           date: isoToday(),
           type: 'weekly',
           title: data.insight?.title ?? 'Insight da semana',
-          body: data.reply,
+          body: data.insight?.body ?? data.reply,
           correlations: data.insight?.correlations ?? null,
           source: 'gemini',
           created_at: data.insight?.created_at ?? new Date().toISOString(),
@@ -88,6 +90,7 @@ export function Insight() {
   const visibleScores = scores.length ? scores : fallbackScores;
   const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: visibleScores });
   const primaryInsight = insights[0] ?? fallbackInsight(correlations[0]);
+  const primaryInsightBody = resolveInsightText(primaryInsight.body, profile?.name);
   const aiHistory = insights
     .filter((insight) => insight.source === 'gemini')
     .slice(0, 5);
@@ -112,7 +115,7 @@ export function Insight() {
         <h1 className="t-display-lg">
           {primaryInsight.title.split(' ').slice(0, 4).join(' ')} <em className="t-display-italic">apareceu.</em>
         </h1>
-        <p className="t-body muted">{primaryInsight.body}</p>
+        <p className="t-body muted">{primaryInsightBody}</p>
       </header>
 
       <section className="card stack">
@@ -222,7 +225,7 @@ export function Insight() {
                   <strong>{insight.title}</strong>
                   <span className="chip">{new Date(insight.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
                 </div>
-                <p className="t-body-sm muted">{insight.body}</p>
+                <p className="t-body-sm muted">{resolveInsightText(insight.body, profile?.name)}</p>
               </article>
             ))}
           </div>

@@ -1,5 +1,4 @@
 import { type CSSProperties, useEffect, useState } from 'react';
-import { BackButton } from '../components/BackButton';
 import { Icon3DLarge } from '../components/Icon3D';
 import { isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -171,8 +170,7 @@ export function Supplements() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">saúde · suplementos e medicamentos</span>
         <h1 className="t-display-lg">
           O que entra <em className="t-display-italic">todo dia.</em>

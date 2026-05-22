@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 
 export type Icon3DKind =
+  | 'home'
   | 'labs'
   | 'supplements'
   | 'vitals'
@@ -15,6 +16,7 @@ export type Icon3DKind =
   | 'olympic';
 
 const COLOR_MAP: Record<Icon3DKind, { accent: string; deep: string }> = {
+  home:        { accent: 'var(--gold)',   deep: 'var(--chocolate)'   },
   labs:        { accent: 'var(--mind)',   deep: 'var(--mind-deep)'   },
   supplements: { accent: 'var(--diet)',   deep: 'var(--diet-deep)'   },
   vitals:      { accent: 'var(--body)',   deep: 'var(--body-deep)'   },
@@ -31,6 +33,15 @@ const COLOR_MAP: Record<Icon3DKind, { accent: string; deep: string }> = {
 
 function IconSvg({ kind }: { kind: Icon3DKind }) {
   switch (kind) {
+    case 'home':
+      return (
+        <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path d="M6.5 15.2 16 7.4l9.5 7.8" />
+          <path d="M9.2 14.2v10.3h13.6V14.2" />
+          <path d="M13.1 24.5v-6.2h5.8v6.2" />
+          <path d="M20.8 9.8V7.4h3.3v5.1" />
+        </svg>
+      );
     case 'labs':
       return (
         <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">

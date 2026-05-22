@@ -1,5 +1,4 @@
 import { type CSSProperties, useEffect, useState } from 'react';
-import { BackButton } from '../components/BackButton';
 import { Icon3D, type Icon3DKind } from '../components/Icon3D';
 import { formatDateShort, isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -14,11 +13,6 @@ interface HealthSummary {
   supplements: {
     total: number;
     takenToday: number;
-  };
-  vitals: {
-    lastDate: string | null;
-    restingHr: number | null;
-    hrv: number | null;
   };
   pain: {
     activeCount: number;
@@ -44,14 +38,6 @@ const HEALTH_SECTIONS = [
     screen: 'supplements' as const,
   },
   {
-    key: 'vitals' as const,
-    title: 'Sinais vitais',
-    subtitle: 'FC, HRV, passos · importar Garmin',
-    icon: 'vitals' as Icon3DKind,
-    color: 'var(--body)',
-    screen: 'vitals' as const,
-  },
-  {
     key: 'pain' as const,
     title: 'Dor e lesões',
     subtitle: 'registrar, rastrear e resolver',
@@ -74,9 +60,8 @@ export function Health() {
       supabase.from('lab_results').select('date, markers').eq('user_id', userId).order('date', { ascending: false }).limit(1),
       supabase.from('supplements').select('id').eq('user_id', userId).eq('active', true),
       supabase.from('supplement_logs').select('supplement_id, taken').eq('user_id', userId).eq('date', today),
-      supabase.from('vitals').select('date, resting_hr, hrv_ms').eq('user_id', userId).order('date', { ascending: false }).limit(1),
       supabase.from('pain_logs').select('region').eq('user_id', userId).eq('resolved', false),
-    ]).then(([labRes, suppRes, logRes, vitalRes, painRes]) => {
+    ]).then(([labRes, suppRes, logRes, painRes]) => {
       const lastLab = labRes.data?.[0];
       const markers = lastLab?.markers as Record<string, { status: string }> | undefined;
       const abnormal = markers ? Object.values(markers).filter((m) => m.status !== 'normal').length : 0;
@@ -84,7 +69,6 @@ export function Health() {
       const suppIds = new Set((suppRes.data ?? []).map((s: { id: string }) => s.id));
       const taken = (logRes.data ?? []).filter((l: { taken: boolean }) => l.taken).length;
 
-      const lastVital = vitalRes.data?.[0];
       const lastPain = painRes.data?.[0];
 
       setSummary({
@@ -97,11 +81,6 @@ export function Health() {
           total: suppIds.size,
           takenToday: taken,
         },
-        vitals: {
-          lastDate: lastVital?.date ?? null,
-          restingHr: lastVital?.resting_hr ?? null,
-          hrv: lastVital?.hrv_ms ?? null,
-        },
         pain: {
           activeCount: (painRes.data ?? []).length,
           lastRegion: lastPain?.region ?? null,
@@ -112,14 +91,13 @@ export function Health() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">saúde · visão geral</span>
         <h1 className="t-display-lg">
           Tudo que o corpo <em className="t-display-italic">registra.</em>
         </h1>
         <p className="t-body muted">
-          Exames, suplementos, sinais vitais e dores em um único lugar.
+          Exames, suplementos e dores em um único lugar.
         </p>
       </header>
 
@@ -141,13 +119,6 @@ export function Health() {
             color="var(--diet)"
             alert={summary.supplements.total > 0 && summary.supplements.takenToday < summary.supplements.total}
             onClick={() => goTo('supplements')}
-          />
-          <StatusCard
-            label="FC repouso"
-            value={summary.vitals.restingHr ? `${summary.vitals.restingHr}` : '—'}
-            sub={summary.vitals.restingHr ? 'bpm' : 'sem dados'}
-            color="var(--body)"
-            onClick={() => goTo('vitals')}
           />
           <StatusCard
             label="dores ativas"
@@ -182,7 +153,6 @@ export function Health() {
         <ul className="health-tips-list">
           <li><strong>Exames</strong> — após consulta ou resultado do lab. A IA extrai tudo da foto.</li>
           <li><strong>Suplementos</strong> — cadastre uma vez, marque diariamente. Aderência conta.</li>
-          <li><strong>Sinais vitais</strong> — importe o CSV do Garmin/Apple ou registre ao acordar.</li>
           <li><strong>Dor</strong> — registre quando aparecer. Rastrear intensidade ao longo do tempo ajuda no diagnóstico.</li>
         </ul>
       </section>
@@ -213,4 +183,3 @@ function StatusCard({
     </button>
   );
 }
-

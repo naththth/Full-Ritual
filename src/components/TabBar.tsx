@@ -11,21 +11,32 @@ type Tab = {
   dim?: string;
 };
 
+const DIM_TO_TAB: Partial<Record<string, TabKey>> = {
+  skin: 'ritual', body: 'body', mind: 'mind', diet: 'diet', spirit: 'spirit',
+};
+
 export function TabBar() {
   const screen = useApp((s) => s.screen);
   const focusedDimension = useApp((s) => s.focusedDimension);
   const goTo = useApp((s) => s.goTo);
+  const activeDimensions = useApp((s) => s.activeDimensions);
 
-  const tabs: Tab[] = [
-    { key: 'home', label: 'Hoje', glyph: 'mandala' },
-    { key: 'energy', label: 'Energia', glyph: 'spark', dim: 'var(--gold)' },
-    { key: 'ritual', label: 'Pele', glyph: 'sun', dim: 'var(--skin)' },
-    { key: 'body', label: 'Corpo', glyph: 'flame', dim: 'var(--body)' },
-    { key: 'mind', label: 'Mente', glyph: 'moon', dim: 'var(--mind)' },
-    { key: 'diet', label: 'Dieta', glyph: 'leaf', dim: 'var(--diet)' },
-    { key: 'spirit', label: 'Espírito', glyph: 'lotus', dim: 'var(--spirit)' },
-    { key: 'insight', label: 'Insight', glyph: 'orbit' },
+  const allTabs: Tab[] = [
+    { key: 'home',    label: 'Hoje',     glyph: 'mandala' },
+    { key: 'energy',  label: 'Energia',  glyph: 'spark',  dim: 'var(--gold)'   },
+    { key: 'ritual',  label: 'Pele',     glyph: 'skin',   dim: 'var(--skin)'   },
+    { key: 'body',    label: 'Corpo',    glyph: 'body',   dim: 'var(--body)'   },
+    { key: 'mind',    label: 'Mente',    glyph: 'brain',  dim: 'var(--mind)'   },
+    { key: 'diet',    label: 'Dieta',    glyph: 'meal',   dim: 'var(--diet)'   },
+    { key: 'spirit',  label: 'Espírito', glyph: 'lotus',  dim: 'var(--spirit)' },
+    { key: 'insight', label: 'Insight',  glyph: 'orbit'  },
   ];
+
+  const tabs = allTabs.filter((t) => {
+    if (t.key === 'home' || t.key === 'energy' || t.key === 'insight') return true;
+    const dimKey = Object.entries(DIM_TO_TAB).find(([, tk]) => tk === t.key)?.[0];
+    return !dimKey || activeDimensions.includes(dimKey as never);
+  });
 
   return (
     <nav className="tabbar" aria-label="Navegação principal">

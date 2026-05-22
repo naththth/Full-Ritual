@@ -7,12 +7,12 @@ import { Insight } from './screens/Insight';
 import { Library } from './screens/Library';
 import { Profile } from './screens/Profile';
 import { Login } from './screens/Login';
+import { Onboarding } from './screens/Onboarding';
 import { Chat } from './screens/Chat';
 import { BodyCoach } from './screens/BodyCoach';
 import { BodyMetrics } from './screens/BodyMetrics';
 import { Labs } from './screens/Labs';
 import { Supplements } from './screens/Supplements';
-import { Vitals } from './screens/Vitals';
 import { Pain } from './screens/Pain';
 import { Health } from './screens/Health';
 import { Diet } from './screens/Diet';
@@ -20,7 +20,7 @@ import { Evolution } from './screens/Evolution';
 import { Mind } from './screens/Mind';
 import { Products } from './screens/Products';
 import { Spirit } from './screens/Spirit';
-import { TabBar } from './components/TabBar';
+import { NavigationMenu } from './components/NavigationMenu';
 import { useApp } from './store/useStore';
 import { supabase, hasSupabase } from './lib/supabase';
 import { isoToday } from './lib/dates';
@@ -29,11 +29,16 @@ import './styles/global.css';
 export default function App() {
   const screen = useApp((s) => s.screen);
   const focusedDimension = useApp((s) => s.focusedDimension);
+  const selectedDate = useApp((s) => s.selectedDate);
   const userId = useApp((s) => s.userId);
   const setUser = useApp((s) => s.setUser);
   const setSelectedDate = useApp((s) => s.setSelectedDate);
   const toast = useApp((s) => s.toast);
   const autoSelectedDate = useRef(isoToday());
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const setProfile = useApp((s) => s.setProfile);
+  const profile = useApp((s) => s.profile);
 
   useEffect(() => {
     if (!hasSupabase) return;
@@ -41,10 +46,23 @@ export default function App() {
       if (data.session) setUser(data.session.user.id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user.id ?? null);
+      if (!session) {
+        setUser(null);
+        setProfile(null);
+      } else {
+        setUser(session.user.id);
+      }
     });
     return () => sub.subscription.unsubscribe();
-  }, [setUser]);
+  }, [setUser, setProfile]);
+
+  useEffect(() => {
+    if (!userId || !hasSupabase) return;
+    setProfile(null); // limpa perfil anterior enquanto carrega
+    supabase.from('profiles').select('*').eq('id', userId).single().then(({ data }) => {
+      if (data) setProfile(data);
+    });
+  }, [userId, setProfile]);
 
   useEffect(() => {
     const handleStorageError = () => {
@@ -85,12 +103,26 @@ export default function App() {
     };
   }, [setSelectedDate]);
 
-  if (!userId) return <Login />;
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [screen, focusedDimension, selectedDate]);
+
+  if (!userId) return (
+    <div className="app-shell"><main className="app"><Login /></main></div>
+  );
+
+  // Perfil ainda carregando — aguarda antes de decidir onboarding
+  const profileLoaded = profile !== null || !hasSupabase;
+  const needsOnboarding = profileLoaded && !profile?.skin_type && !profile?.sport_modalities?.length;
+  const showOnboarding = needsOnboarding || screen === 'onboarding';
 
   return (
     <div className="app-shell">
       <main className="app">
-        <div className="scroll">
+        {showOnboarding ? <Onboarding /> : (
+          <>
+        <NavigationMenu />
+        <div className="scroll" ref={scrollRef}>
           {screen === 'home' && <Home />}
           {screen === 'energy' && <Energy />}
           {screen === 'ritual' && <Ritual />}
@@ -108,7 +140,6 @@ export default function App() {
           {screen === 'body_metrics' && <BodyMetrics />}
           {screen === 'labs' && <Labs />}
           {screen === 'supplements' && <Supplements />}
-          {screen === 'vitals' && <Vitals />}
           {screen === 'pain' && <Pain />}
           {screen === 'health' && <Health />}
           {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}
@@ -117,11 +148,12 @@ export default function App() {
           {screen === 'dimension' && focusedDimension === 'diet' && <Diet />}
           {screen === 'dimension' && focusedDimension === 'spirit' && <Spirit />}
         </div>
-        <TabBar />
         {toast && (
           <div className="app-toast" role="status" aria-live="polite">
             {toast}
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

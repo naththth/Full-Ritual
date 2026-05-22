@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { BackButton } from '../components/BackButton';
-import { Icon3D } from '../components/Icon3D';
 import { useApp } from '../store/useStore';
 import { supabase, hasSupabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
@@ -58,22 +56,21 @@ const SPIRIT: { value: SpiritTheme; label: string }[] = [
   { value: 'criatividade',    label: 'criatividade' },
 ];
 
-function SettingsArrow() {
-  return (
-    <span className="settings-arrow" aria-hidden="true">
-      <svg viewBox="0 0 24 24" focusable="false">
-        <path d="M8.5 5.5 15 12l-6.5 6.5" />
-      </svg>
-    </span>
-  );
-}
-
 export function Profile() {
   const profile = useApp((s) => s.profile);
   const userId = useApp((s) => s.userId);
   const setProfile = useApp((s) => s.setProfile);
   const showToast = useApp((s) => s.showToast);
-  const goTo = useApp((s) => s.goTo);
+  const activeDimensions = useApp((s) => s.activeDimensions);
+  const sexoStore = useApp((s) => s.sexo);
+  const setSexoStore = useApp((s) => s.setSexo);
+
+  const hasSkin   = activeDimensions.includes('skin');
+  const hasBody   = activeDimensions.includes('body');
+  const hasMind   = activeDimensions.includes('mind');
+  const hasDiet   = activeDimensions.includes('diet');
+  const hasSpirit = activeDimensions.includes('spirit');
+  const hasCycle  = sexoStore === 'feminino' || sexoStore === 'outro';
 
   const [name, setName] = useState(profile?.name ?? '');
   const [birthdate, setBirthdate] = useState(profile?.birthdate ?? '');
@@ -210,8 +207,7 @@ export function Profile() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">perfil · ritual pessoal</span>
         <h1 className="t-display-lg">
           O que <em className="t-display-italic">rege</em> seus dias.
@@ -255,167 +251,125 @@ export function Profile() {
         </div>
 
         <div>
-          <span className="eyebrow">tipo de pele</span>
+          <span className="eyebrow">sexo biológico</span>
           <div className="chip-wrap" style={{ marginTop: 8 }}>
-            {SKIN_TYPES.map((t) => (
+            {(['masculino', 'feminino', 'outro'] as const).map((s) => (
               <button
-                key={t.value}
-                className={`chip ${skinType === t.value ? 'chip--active' : ''}`}
-                onClick={() => setSkinType(t.value)}
+                key={s}
+                className={`chip ${sexoStore === s ? 'chip--active' : ''}`}
+                onClick={() => {
+                  setSexoStore(s);
+                  if (s === 'masculino' && hasSupabase && userId && profile?.cycle_tracking) {
+                    supabase.from('profiles').upsert({ id: userId, cycle_tracking: false }).then(() => {
+                      if (profile) setProfile({ ...profile, cycle_tracking: false });
+                    });
+                  }
+                }}
               >
-                {t.label}
+                {s}
               </button>
             ))}
           </div>
         </div>
+
+        {hasSkin && (
+          <div>
+            <span className="eyebrow">tipo de pele</span>
+            <div className="chip-wrap" style={{ marginTop: 8 }}>
+              {SKIN_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  className={`chip ${skinType === t.value ? 'chip--active' : ''}`}
+                  onClick={() => setSkinType(t.value)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
-      <section className="card stack settings-card">
-        <span className="eyebrow">configuração · app</span>
-        <button className="settings-row settings-row--mind" onClick={() => goTo('health')}>
-          <Icon3D kind="health" size={42} />
-          <span>
-            <strong>Hub de Saúde</strong>
-            <small>exames, suplementos, sinais vitais e dores</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--skin" onClick={() => goTo('products')}>
-          <Icon3D kind="skincare" size={42} />
-          <span>
-            <strong>Produtos e rotina skincare</strong>
-            <small>cadastro, frequência e regeneração da ordem de uso</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--mind" onClick={() => goTo('library')}>
-          <Icon3D kind="library" size={42} />
-          <span>
-            <strong>Biblioteca e leitura</strong>
-            <small>importar Goodreads, cadastrar livros e registrar páginas</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--body" onClick={() => goTo('body_metrics')}>
-          <Icon3D kind="body" size={42} />
-          <span>
-            <strong>Peso, altura e composição</strong>
-            <small>registrar medidas, foto pra IA analisar e ver evolução</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--body" onClick={() => goTo('pain')}>
-          <Icon3D kind="pain" size={42} />
-          <span>
-            <strong>Dor e lesões</strong>
-            <small>registrar dores, intensidade e acompanhar recuperação</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--spirit" onClick={() => goTo('vitals')}>
-          <Icon3D kind="vitals" size={42} />
-          <span>
-            <strong>Sinais vitais</strong>
-            <small>FC repouso, HRV, passos · importar CSV do Garmin ou Apple Health</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--body" onClick={() => goTo('supplements')}>
-          <Icon3D kind="supplements" size={42} />
-          <span>
-            <strong>Suplementos e medicamentos</strong>
-            <small>aderência diária, doses e horários de uso contínuo</small>
-          </span>
-          <SettingsArrow />
-        </button>
-        <button className="settings-row settings-row--mind" onClick={() => goTo('labs')}>
-          <Icon3D kind="labs" size={42} />
-          <span>
-            <strong>Exames laboratoriais</strong>
-            <small>foto do laudo, IA extrai marcadores e rastreia tendências</small>
-          </span>
-          <SettingsArrow />
-        </button>
-      </section>
+      {hasBody && (
+        <PreferenceBlock
+          eyebrow="modalidades · esporte"
+          title="O que seu corpo pratica."
+          hint="influencia as sugestões de treino, recuperação e ritmo."
+          options={SPORTS}
+          selected={sports}
+          onToggle={(v) => toggle(sports, v, setSports)}
+        />
+      )}
 
-      <PreferenceBlock
-        eyebrow="modalidades · esporte"
-        title="O que seu corpo pratica."
-        hint="influencia as sugestões de treino, recuperação e ritmo."
-        options={SPORTS}
-        selected={sports}
-        onToggle={(v) => toggle(sports, v, setSports)}
-      />
+      {hasMind && (
+        <PreferenceBlock
+          eyebrow="som · trilha"
+          title="Como você gosta de escutar."
+          hint="a IA pode sugerir uma playlist quando o ritual pedir foco ou pausa."
+          options={MUSIC}
+          selected={music}
+          onToggle={(v) => toggle(music, v, setMusic)}
+        />
+      )}
 
-      <PreferenceBlock
-        eyebrow="som · trilha"
-        title="Como você gosta de escutar."
-        hint="a IA pode sugerir uma playlist quando o ritual pedir foco ou pausa."
-        options={MUSIC}
-        selected={music}
-        onToggle={(v) => toggle(music, v, setMusic)}
-      />
+      {hasMind && (
+        <PreferenceBlock
+          eyebrow="leitura · skills"
+          title="Onde sua mente quer ir."
+          hint="alimenta as sugestões de leitura, podcast e conteúdo."
+          options={CONTENT}
+          selected={content}
+          onToggle={(v) => toggle(content, v, setContent)}
+        />
+      )}
 
-      <PreferenceBlock
-        eyebrow="leitura · skills"
-        title="Onde sua mente quer ir."
-        hint="alimenta as sugestões de leitura, podcast e conteúdo."
-        options={CONTENT}
-        selected={content}
-        onToggle={(v) => toggle(content, v, setContent)}
-      />
-
-      <PreferenceBlock
-        eyebrow="espírito · temas"
-        title="O que te chama de volta para si."
-        hint="define as perguntas que o check-in espírito vai te fazer."
-        options={SPIRIT}
-        selected={themes}
-        onToggle={(v) => toggle(themes, v, setThemes)}
-      />
+      {hasSpirit && (
+        <PreferenceBlock
+          eyebrow="espírito · temas"
+          title="O que te chama de volta para si."
+          hint="define as perguntas que o check-in espírito vai te fazer."
+          options={SPIRIT}
+          selected={themes}
+          onToggle={(v) => toggle(themes, v, setThemes)}
+        />
+      )}
 
       <section className="card stack">
         <span className="eyebrow">metas · saúde diária</span>
         <p className="t-body-sm muted">Usadas nos relatórios de progresso e alertas de débito.</p>
         <div className="profile-goals-grid">
-          <GoalField
-            label="sono"
-            unit="h"
-            value={goalSleepH}
-            min={5}
-            max={10}
-            step={0.5}
-            onChange={setGoalSleepH}
-          />
-          <GoalField
-            label="água"
-            unit="L"
-            value={goalWaterL}
-            min={1}
-            max={5}
-            step={0.25}
-            onChange={setGoalWaterL}
-          />
-          <GoalField
-            label="meditação"
-            unit="min"
-            value={goalMeditationMin}
-            min={5}
-            max={60}
-            step={5}
-            onChange={setGoalMeditationMin}
-          />
-          <GoalField
-            label="leitura"
-            unit="pág"
-            value={goalReadingPages}
-            min={5}
-            max={100}
-            step={5}
-            onChange={setGoalReadingPages}
-          />
+          <GoalField label="sono" unit="h" value={goalSleepH} min={5} max={10} step={0.5} onChange={setGoalSleepH} />
+          {hasDiet && (
+            <GoalField label="água" unit="L" value={goalWaterL} min={1} max={5} step={0.25} onChange={setGoalWaterL} />
+          )}
+          {hasMind && (
+            <GoalField label="meditação" unit="min" value={goalMeditationMin} min={5} max={60} step={5} onChange={setGoalMeditationMin} />
+          )}
+          {hasMind && (
+            <GoalField label="leitura" unit="pág" value={goalReadingPages} min={5} max={100} step={5} onChange={setGoalReadingPages} />
+          )}
         </div>
       </section>
+
+      {hasCycle && (
+        <section className="card stack">
+          <span className="eyebrow">ciclo menstrual</span>
+          <p className="t-body-sm muted">Configura o acompanhamento de fases na tela Energia.</p>
+          <div className="chip-wrap">
+            <button
+              className={`chip ${profile?.cycle_tracking ? 'chip--active' : ''}`}
+              onClick={() => {
+                if (!hasSupabase || !userId) return;
+                supabase.from('profiles').upsert({ id: userId, cycle_tracking: !profile?.cycle_tracking }).then(() => {
+                  if (profile) setProfile({ ...profile, cycle_tracking: !profile.cycle_tracking });
+                });
+              }}
+            >
+              {profile?.cycle_tracking ? 'ativado' : 'desativado'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <button className="btn btn--primary btn--full" onClick={() => void saveProfile()} disabled={saving}>
         {saving ? 'salvando...' : 'salvar alterações'}

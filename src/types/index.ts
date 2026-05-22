@@ -6,10 +6,10 @@
 export type DimensionKey = 'skin' | 'body' | 'mind' | 'diet' | 'spirit';
 
 export const DIMENSIONS: Record<DimensionKey, { label: string; color: string; glyph: string }> = {
-  skin:   { label: 'Pele',     color: 'var(--skin)',   glyph: '◐' },
-  body:   { label: 'Corpo',    color: 'var(--body)',   glyph: '◑' },
-  mind:   { label: 'Mente',    color: 'var(--mind)',   glyph: '○' },
-  diet:   { label: 'Dieta',    color: 'var(--diet)',   glyph: '◍' },
+  skin:   { label: 'Pele',     color: 'var(--skin)',   glyph: '💧' },
+  body:   { label: 'Corpo',    color: 'var(--body)',   glyph: '🏃' },
+  mind:   { label: 'Mente',    color: 'var(--mind)',   glyph: '🧠' },
+  diet:   { label: 'Dieta',    color: 'var(--diet)',   glyph: '🍽' },
   spirit: { label: 'Espírito', color: 'var(--spirit)', glyph: '✦' },
 };
 

@@ -1,11 +1,9 @@
-import { BackButton } from '../components/BackButton';
 import { BodyMetricsSection } from '../components/BodyMetricsSection';
 
 export function BodyMetrics() {
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">configuração · corpo</span>
         <h1 className="t-display-lg">
           peso, altura e <em className="t-display-italic">composição</em>.

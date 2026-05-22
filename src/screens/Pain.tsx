@@ -1,5 +1,4 @@
 import { type CSSProperties, useEffect, useState } from 'react';
-import { BackButton } from '../components/BackButton';
 import { Icon3DLarge } from '../components/Icon3D';
 import { formatDateShort, isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -135,8 +134,7 @@ export function Pain() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">saúde · dor e lesões</span>
         <h1 className="t-display-lg">
           O que o corpo <em className="t-display-italic">avisa.</em>
@@ -318,4 +316,3 @@ function PainCard({
     </article>
   );
 }
-

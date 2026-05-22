@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BackButton } from '../components/BackButton';
 import { BookThumb } from '../components/BookThumb';
 import { type BookSuggestion, searchBookSuggestions } from '../lib/bookSearch';
 import { isoToday } from '../lib/dates';
@@ -224,8 +223,7 @@ export function Library() {
 
   return (
     <div className="screen stack-md library-screen">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">biblioteca · leitura</span>
         <h1 className="t-display-lg">
           Sua leitura também vira <em className="t-display-italic">ritual.</em>

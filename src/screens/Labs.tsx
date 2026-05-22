@@ -1,5 +1,4 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { BackButton } from '../components/BackButton';
 import { Icon3DLarge } from '../components/Icon3D';
 import { formatDateLong, isoToday } from '../lib/dates';
 import { fileToBase64 } from '../lib/files';
@@ -160,8 +159,7 @@ export function Labs() {
 
   return (
     <div className="screen stack-md">
-      <header className="screen-header stack">
-        <BackButton />
+      <header className="stack">
         <span className="eyebrow">saúde · exames</span>
         <h1 className="t-display-lg">
           O que seu <em className="t-display-italic">sangue conta.</em>
@@ -401,4 +399,3 @@ function LabTrends({ results }: { results: LabResult[] }) {
     </section>
   );
 }
-

@@ -138,6 +138,7 @@ Deno.serve(async (req: Request) => {
     let savedInsight = null;
     if (saveInsight) {
       const title = 'Insight da semana';
+      const insightBody = personalizeInsightBody(reply, profile?.name);
       const { data: insertedInsight, error: insightError } = await supabase
         .from('insights')
         .insert({
@@ -145,7 +146,7 @@ Deno.serve(async (req: Request) => {
           date: today,
           type: 'weekly',
           title,
-          body: reply,
+          body: insightBody,
           correlations: null,
           source: 'gemini',
         })
@@ -191,6 +192,13 @@ function extractText(candidate: any): string {
 function normalizeContext(context: ReqBody['context']): { recent_summary?: string; focus_dimension?: string } {
   if (typeof context === 'string') return { recent_summary: context };
   return context ?? {};
+}
+
+function personalizeInsightBody(text: string, profileName?: string | null): string {
+  const name = profileName?.trim();
+  if (!name) return text;
+
+  return text.split(name).join('{{profile_name}}');
 }
 
 function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, extra }: {
