@@ -18,7 +18,9 @@ export type Screen =
   | 'products'
   | 'library'
   | 'evolution'
-  | 'chat';
+  | 'chat'
+  | 'body_coach'
+  | 'body_metrics';
 
 interface NavigationEntry {
   screen: Screen;
@@ -114,11 +116,25 @@ export const useApp = create<AppState>()(
       name: 'full-ritual-session',
       storage: createJSONStorage(() => safeStringStorage),
       version: 1,
+      partialize: (state) => {
+        const { selectedDate: _selectedDate, ...persistedState } = state;
+        return persistedState;
+      },
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(persistedState as Partial<AppState>),
+        selectedDate: isoToday(),
+      }),
       migrate: (persistedState) => {
         const state = persistedState as AppState;
-        return (state?.screen as string) === 'sleep'
-          ? { ...state, screen: 'energy' }
+        const migratedState = (state?.screen as string) === 'sleep'
+          ? { ...state, screen: 'energy' as Screen }
           : state;
+
+        return {
+          ...migratedState,
+          selectedDate: isoToday(),
+        };
       },
     }
   )

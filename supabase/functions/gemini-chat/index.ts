@@ -64,11 +64,12 @@ Deno.serve(async (req: Request) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       .toISOString().slice(0, 10);
 
-    const [profileRes, checkinsRes, sleepRes, insightsRes] = await Promise.all([
+    const [profileRes, checkinsRes, sleepRes, insightsRes, bodyMetricsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('checkins').select('*').gte('date', sevenDaysAgo).order('date', { ascending: false }),
       supabase.from('sleep_logs').select('*').gte('date', sevenDaysAgo).order('date', { ascending: false }),
       supabase.from('insights').select('title, body, date').order('date', { ascending: false }).limit(3),
+      supabase.from('body_metrics').select('date,weight_kg,height_cm,body_fat_pct,ai_analysis').eq('user_id', user.id).order('date', { ascending: false }).limit(8),
     ]);
 
     const profile = profileRes.data;
@@ -77,6 +78,7 @@ Deno.serve(async (req: Request) => {
       checkins: checkinsRes.data ?? [],
       sleep: sleepRes.data ?? [],
       insights: insightsRes.data ?? [],
+      bodyMetrics: bodyMetricsRes.data ?? [],
       extra: context.recent_summary,
     });
 
@@ -160,8 +162,8 @@ function extractText(candidate: any): string {
     .trim();
 }
 
-function buildContextSummary({ profile, checkins, sleep, insights, extra }: {
-  profile: any; checkins: any[]; sleep: any[]; insights: any[]; extra?: string;
+function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, extra }: {
+  profile: any; checkins: any[]; sleep: any[]; insights: any[]; bodyMetrics: any[]; extra?: string;
 }): string {
   const parts: string[] = [];
 
@@ -194,6 +196,20 @@ function buildContextSummary({ profile, checkins, sleep, insights, extra }: {
 
   if (insights.length) {
     parts.push(`Insights recentes: ${insights.map((i) => i.title).join(' | ')}.`);
+  }
+
+  if (bodyMetrics?.length) {
+    const latest = bodyMetrics[0];
+    const a = latest.ai_analysis ?? {};
+    const trendLine = a.trend ? `, tendência ${a.trend}` : '';
+    const fatLine = Array.isArray(a.fat_distribution) && a.fat_distribution.length
+      ? `, gordura mais visível em ${a.fat_distribution.join(', ')}`
+      : '';
+    parts.push(
+      `Medidas mais recentes (${latest.date}): peso ${latest.weight_kg ?? '?'}kg, altura ${latest.height_cm ?? '?'}cm, ` +
+      `%gordura ${latest.body_fat_pct ?? 'não informado'}${trendLine}${fatLine}. ` +
+      `Use isso para calibrar sugestões alimentares (déficit/superávit, proteína, retenção, hidratação).`
+    );
   }
 
   if (extra) parts.push(extra);

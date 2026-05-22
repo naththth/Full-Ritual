@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Home } from './screens/Home';
 import { Energy } from './screens/Energy';
 import { Ritual } from './screens/Ritual';
@@ -8,6 +8,8 @@ import { Library } from './screens/Library';
 import { Profile } from './screens/Profile';
 import { Login } from './screens/Login';
 import { Chat } from './screens/Chat';
+import { BodyCoach } from './screens/BodyCoach';
+import { BodyMetrics } from './screens/BodyMetrics';
 import { Diet } from './screens/Diet';
 import { Evolution } from './screens/Evolution';
 import { Mind } from './screens/Mind';
@@ -16,6 +18,7 @@ import { Spirit } from './screens/Spirit';
 import { TabBar } from './components/TabBar';
 import { useApp } from './store/useStore';
 import { supabase, hasSupabase } from './lib/supabase';
+import { isoToday } from './lib/dates';
 import './styles/global.css';
 
 export default function App() {
@@ -23,7 +26,9 @@ export default function App() {
   const focusedDimension = useApp((s) => s.focusedDimension);
   const userId = useApp((s) => s.userId);
   const setUser = useApp((s) => s.setUser);
+  const setSelectedDate = useApp((s) => s.setSelectedDate);
   const toast = useApp((s) => s.toast);
+  const autoSelectedDate = useRef(isoToday());
 
   // Sessão Supabase
   useEffect(() => {
@@ -45,6 +50,37 @@ export default function App() {
     return () => window.removeEventListener('full-ritual:storage-error', handleStorageError);
   }, []);
 
+  useEffect(() => {
+    const selectToday = () => {
+      const today = isoToday();
+      autoSelectedDate.current = today;
+      setSelectedDate(today);
+    };
+    const refreshTodayIfStillOnAutoDate = () => {
+      const state = useApp.getState();
+      const today = isoToday();
+
+      if (state.selectedDate === autoSelectedDate.current) {
+        autoSelectedDate.current = today;
+        state.setSelectedDate(today);
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshTodayIfStillOnAutoDate();
+    };
+
+    selectToday();
+    window.addEventListener('focus', refreshTodayIfStillOnAutoDate);
+    window.addEventListener('pageshow', refreshTodayIfStillOnAutoDate);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', refreshTodayIfStillOnAutoDate);
+      window.removeEventListener('pageshow', refreshTodayIfStillOnAutoDate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [setSelectedDate]);
+
   if (!userId) return <Login />;
 
   return (
@@ -64,6 +100,8 @@ export default function App() {
           {screen === 'library' && <Library />}
           {screen === 'evolution' && <Evolution />}
           {screen === 'chat' && <Chat />}
+          {screen === 'body_coach' && <BodyCoach />}
+          {screen === 'body_metrics' && <BodyMetrics />}
           {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}
           {screen === 'dimension' && focusedDimension === 'body' && <Body />}
           {screen === 'dimension' && focusedDimension === 'mind' && <Mind />}

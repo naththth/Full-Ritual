@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import CircleButton from '../components/CircleButton';
 import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
@@ -5,6 +7,11 @@ import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
+
+const orderedMealVariants = (variants: Record<string, unknown>) => [
+  'principal',
+  ...Object.keys(variants).filter((variant) => variant !== 'principal'),
+];
 
 interface MealState {
   variant: string;
@@ -17,6 +24,14 @@ interface DietState {
   meals: Record<string, MealState>;
 }
 
+interface DietAiAddition {
+  id: string;
+  meal_type: 'manha' | 'almoco' | 'lanche' | 'jantar' | 'ceia' | null;
+  title: string;
+  note?: string | null;
+  rationale?: string | null;
+}
+
 const initialDiet: DietState = {
   water: 0,
   meals: {},
@@ -27,9 +42,39 @@ export function Diet() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
   const [diet, setDiet] = useLocalState<DietState>(`full-ritual-diet-${selectedDate}`, initialDiet);
+  const [aiAdditions, setAiAdditions] = useState<DietAiAddition[]>([]);
   const dateLabel = relativeDateLabel(selectedDate);
 
   const target = 2.5;
+
+  useEffect(() => {
+    if (!hasSupabase || !userId) {
+      setAiAdditions([]);
+      return;
+    }
+
+    let alive = true;
+    void supabase
+      .from('diet_ai_additions')
+      .select('id, meal_type, title, note, rationale')
+      .eq('user_id', userId)
+      .eq('date', selectedDate)
+      .eq('dismissed', false)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) {
+          console.error(error);
+          setAiAdditions([]);
+          return;
+        }
+        setAiAdditions((data ?? []) as DietAiAddition[]);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [selectedDate, userId]);
 
   const updateMeal = (mealId: string, patch: Partial<MealState>) => {
     setDiet((current) => {
@@ -76,6 +121,18 @@ export function Diet() {
     }
   };
 
+  const dismissAiAddition = async (id: string) => {
+    setAiAdditions((current) => current.filter((addition) => addition.id !== id));
+    if (!hasSupabase) return;
+    const { error } = await supabase.from('diet_ai_additions').update({ dismissed: true }).eq('id', id);
+    if (error) {
+      console.error(error);
+      showToast('não consegui dispensar a sugestão.');
+    }
+  };
+
+  const generalAiAdditions = aiAdditions.filter((addition) => !addition.meal_type);
+
   useAutoSave(diet, async () => {
     if (!hasSupabase || !userId) return;
     try {
@@ -114,6 +171,15 @@ export function Diet() {
         </p>
       </header>
 
+      {generalAiAdditions.length > 0 && (
+        <section className="diet-ai-card stack">
+          <span className="eyebrow">sugestões da IA coach</span>
+          {generalAiAdditions.map((addition) => (
+            <AiAdditionRow key={addition.id} addition={addition} onDismiss={dismissAiAddition} />
+          ))}
+        </section>
+      )}
+
       <section className="card diet-water-card stack" style={{ '--dim': 'var(--diet)' } as React.CSSProperties}>
         <span className="eyebrow">água e recuperação</span>
         <div className="t-display-md">
@@ -137,6 +203,7 @@ export function Diet() {
         const state = diet.meals[meal.id] ?? { variant: recommendedVariant, checks: {} };
         const items = meal.variants[state.variant] ?? meal.variants.principal;
         const done = items.filter((_, index) => state.checks[index]).length;
+        const mealAiAdditions = aiAdditions.filter((addition) => addition.meal_type === meal.mealType);
 
         return (
           <details
@@ -149,6 +216,17 @@ export function Diet() {
                 <span className="eyebrow">{meal.title}</span>
                 <strong>{done ? `${done} escolhidos` : meal.time}</strong>
               </span>
+              <button
+                className="panel-toggle"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const details = (e.currentTarget as HTMLElement).closest('details') as HTMLDetailsElement | null;
+                  if (details) details.open = !details.open;
+                }}
+                aria-label={"Abrir/fechar " + meal.title}
+              >
+                <CircleButton ariaLabel={"Alternar " + meal.title} color="var(--diet)" />
+              </button>
             </summary>
 
             <div className="dimension-panel-body">
@@ -161,13 +239,13 @@ export function Diet() {
               </div>
 
               <div className="chip-row">
-                {Object.keys(meal.variants).map((variant) => (
+                {orderedMealVariants(meal.variants).map((variant) => (
                   <button
                     key={variant}
                     className={`chip ${state.variant === variant ? 'chip--active' : ''}`}
                     onClick={() => updateMeal(meal.id, { variant, checks: {} })}
                   >
-                    {variant === recommendedVariant ? 'sugestão' : variant === 'principal' ? 'principal' : variant.replace('sub', 'sub ')}
+                    {variant === 'principal' ? 'principal' : variant === recommendedVariant ? 'sugestão' : variant.replace('sub', 'sub ')}
                   </button>
                 ))}
               </div>
@@ -187,6 +265,14 @@ export function Diet() {
                   </button>
                 ))}
               </div>
+
+              {mealAiAdditions.length > 0 && (
+                <div className="meal-ai-additions">
+                  {mealAiAdditions.map((addition) => (
+                    <AiAdditionRow key={addition.id} addition={addition} onDismiss={dismissAiAddition} />
+                  ))}
+                </div>
+              )}
 
               <div className="inline-actions">
                 <label className="file-button">
@@ -214,5 +300,28 @@ export function Diet() {
       })}
 
     </div>
+  );
+}
+
+function AiAdditionRow({
+  addition,
+  onDismiss,
+}: {
+  addition: DietAiAddition;
+  onDismiss: (id: string) => void;
+}) {
+  return (
+    <article className="diet-ai-item">
+      <span className="diet-ai-item__mark">IA</span>
+      <span>
+        <strong>{addition.title}</strong>
+        {(addition.note || addition.rationale) && (
+          <small>{addition.note || addition.rationale}</small>
+        )}
+      </span>
+      <div>
+        <CircleButton variant="close" ariaLabel="Dispensar sugestão" onClick={() => void onDismiss(addition.id)} />
+      </div>
+    </article>
   );
 }

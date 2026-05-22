@@ -6,6 +6,7 @@
 
 // @ts-expect-error Deno runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { TRAINING_COACH_RULES, COACH_VOICE_RULES } from '../_shared/training-rules.ts';
 
 // @ts-expect-error Deno global
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
@@ -53,13 +54,14 @@ Deno.serve(async (req: Request) => {
     since.setDate(since.getDate() - 21);
     const sinceIso = since.toISOString().slice(0, 10);
 
-    const [profileRes, trainingProfileRes, previousPlansRes, workoutsRes, sleepRes, checkinsRes] = await Promise.all([
+    const [profileRes, trainingProfileRes, previousPlansRes, workoutsRes, sleepRes, checkinsRes, bodyMetricsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('training_profile').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('training_plans').select('*').eq('user_id', user.id).order('generated_at', { ascending: false }).limit(2),
       supabase.from('garmin_workouts').select('*').eq('user_id', user.id).gte('date', sinceIso).order('date', { ascending: false }).limit(10),
       supabase.from('sleep_logs').select('*').gte('date', sinceIso).order('date', { ascending: false }).limit(21),
       supabase.from('checkins').select('*').gte('date', sinceIso).order('date', { ascending: false }).limit(21),
+      supabase.from('body_metrics').select('date,weight_kg,height_cm,body_fat_pct,ai_analysis').eq('user_id', user.id).order('date', { ascending: false }).limit(8),
     ]);
 
     if (trainingProfileRes.error) return json({ error: trainingProfileRes.error.message }, 500);
@@ -75,6 +77,7 @@ Deno.serve(async (req: Request) => {
       workouts: workoutsRes.data ?? [],
       sleep: sleepRes.data ?? [],
       checkins: checkinsRes.data ?? [],
+      bodyMetrics: bodyMetricsRes.data ?? [],
     });
 
     const geminiRes = await fetch(
@@ -154,7 +157,11 @@ Deno.serve(async (req: Request) => {
 });
 
 function systemPrompt() {
-  return `Você é um treinador do Full Ritual. Gere planos de treino seguros, específicos e consultáveis no mobile.
+  return `${TRAINING_COACH_RULES}
+
+${COACH_VOICE_RULES}
+
+Você está gerando o plano semanal estruturado da tela Corpo do Full Ritual. Aplique as regras técnicas acima dentro do schema mobile abaixo.
 
 Regras duras:
 - Responda somente JSON válido.
@@ -164,13 +171,14 @@ Regras duras:
 - Nunca misture pedal e musculação dentro do mesmo bloco.
 - Cada modalidade deve ter no máximo 3 blocos principais: aquecimento, série/treino, desaquecimento.
 - O conteúdo de cada bloco deve ser claro para consulta durante o treino, com linhas separadas por \\n.
-- Musculação: cada linha da série deve começar pelo nome do exercício, depois prescrição. Exemplo: "Agachamento livre — 4×8 · RPE 7 · desc 2min". Não quebre RPE/descanso em linhas separadas.
+- Musculação: priorize força absoluta e desenvolvimento neuromuscular. Cada linha da série deve começar pelo nome do exercício, depois prescrição. Exemplo: "Agachamento livre — 5×3 · RPE 8 · desc 3min". Não quebre RPE/descanso em linhas separadas.
 - Pedal: sempre assuma speed no rolo/smart trainer. Use potência, cadência e RPE; explique a execução como treinador para atleta, com linguagem técnica porém acessível.
 - Pedal no rolo: não use velocidade como métrica principal. Priorize watts, zonas, cadência, estabilidade de quadril, tronco quieto e recuperação entre blocos.
 - Pedal no rolo: se precisar explicar contexto, coloque em linha separada como "Leitura do rolo — ...". Não coloque frases longas dentro de chips/prescrições.
 - Se houver limitação, reduza intensidade e explique no notes.
 - Use FTP do pedal quando existir. Use pace da corrida quando existir.
-- Não invente lesões, exames, diagnósticos ou métricas que não foram fornecidas.`;
+- Não invente lesões, exames, diagnósticos ou métricas que não foram fornecidas.
+- Se faltarem dados para uma prescrição fina, gere um plano conservador e registre em notes quais dados refinariam a próxima geração.`;
 }
 
 function buildPrompt(input: {
@@ -182,6 +190,7 @@ function buildPrompt(input: {
   workouts: unknown[];
   sleep: unknown[];
   checkins: unknown[];
+  bodyMetrics: unknown[];
 }) {
   const schema = {
     plan_json: [
@@ -220,6 +229,8 @@ function buildPrompt(input: {
     recent_uploaded_workouts: input.workouts,
     recent_sleep_logs: input.sleep,
     recent_checkins: input.checkins,
+    recent_body_metrics: input.bodyMetrics,
+    body_metrics_guidance: 'Use peso, %gordura (quando informado), tendência (emagrecendo/estável/ganhando) e distribuição de gordura para calibrar volume, intensidade, foco muscular e cardio.',
   });
 }
 

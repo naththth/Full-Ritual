@@ -42,6 +42,11 @@ export interface Profile {
   content_prefs: ContentPref[];
   spirit_themes: SpiritTheme[];
 
+  target_weight_kg: number | null;
+  target_weight_kg_max: number | null;
+  target_body_fat_pct: number | null;
+  target_date: string | null;
+
   ai_enabled: boolean;
   notifications_enabled: boolean;
 
@@ -301,6 +306,33 @@ export interface GarminWorkout {
   file_url: string | null;
   parsed_data: Record<string, unknown> | null;
   ai_feedback: string | null;
+  created_at: string;
+}
+
+// ---------- MEDIDAS CORPORAIS ----------
+export interface BodyAiAnalysis {
+  fat_distribution: string[];
+  trend: 'emagrecendo' | 'estavel' | 'ganhando' | 'indeterminado';
+  observations: string[];
+  suggestions_training: string[];
+  suggestions_diet: string[];
+}
+
+export interface BodyMetric {
+  id: string;
+  user_id: string;
+  date: string;
+  weight_kg: number | null;
+  height_cm: number | null;
+  body_fat_pct: number | null;
+  waist_cm: number | null;
+  hip_cm: number | null;
+  chest_cm: number | null;
+  arm_cm: number | null;
+  thigh_cm: number | null;
+  neck_cm: number | null;
+  ai_analysis: BodyAiAnalysis | null;
+  note: string | null;
   created_at: string;
 }
 

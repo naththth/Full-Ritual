@@ -506,29 +506,130 @@ function DaySelector({
   onSelect: (date: string) => void;
 }) {
   const todayIso = isoToday();
+  const [monthOpen, setMonthOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => dateFromIso(selectedDate));
+  const monthDays = useMemo(() => getMonthCalendarDays(visibleMonth), [visibleMonth]);
+  const monthLabel = visibleMonth
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    .toLowerCase();
+
+  const selectDate = (dateIso: string) => {
+    onSelect(dateIso);
+    setVisibleMonth(dateFromIso(dateIso));
+  };
+
+  const selectMonthDate = (dateIso: string) => {
+    selectDate(dateIso);
+    setMonthOpen(false);
+  };
+
+  const shiftMonth = (months: number) => {
+    setVisibleMonth((current) => {
+      const next = new Date(current);
+      next.setDate(1);
+      next.setMonth(next.getMonth() + months);
+      return next;
+    });
+  };
 
   return (
-    <div className="week-strip" aria-label="Escolher dia da semana">
-      {days.map((dateIso) => {
-        const date = dateFromIso(dateIso);
-        const active = dateIso === selectedDate;
-        const isToday = dateIso === todayIso;
-        const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    <div className="date-picker">
+      <div className="date-picker-top">
+        <button
+          type="button"
+          className="date-picker-month-toggle"
+          onClick={() => {
+            setVisibleMonth(dateFromIso(selectedDate));
+            setMonthOpen((open) => !open);
+          }}
+          aria-expanded={monthOpen}
+        >
+          mês
+        </button>
+        <button
+          type="button"
+          className="date-picker-today"
+          onClick={() => selectDate(todayIso)}
+        >
+          hoje
+        </button>
+      </div>
 
-        return (
-          <button
-            key={dateIso}
-            className={`day-chip ${active ? 'day-chip--active' : ''} ${isToday ? 'day-chip--today' : ''}`}
-            onClick={() => onSelect(dateIso)}
-            aria-pressed={active}
-          >
-            <span>{weekday}</span>
-            <strong>{date.getDate()}</strong>
-          </button>
-        );
-      })}
+      <div className="week-strip" aria-label="Escolher dia da semana">
+        {days.map((dateIso) => {
+          const date = dateFromIso(dateIso);
+          const active = dateIso === selectedDate;
+          const isToday = dateIso === todayIso;
+          const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+
+          return (
+            <button
+              key={dateIso}
+              className={`day-chip ${active ? 'day-chip--active' : ''} ${isToday ? 'day-chip--today' : ''}`}
+              onClick={() => selectDate(dateIso)}
+              aria-pressed={active}
+            >
+              <span>{weekday}</span>
+              <strong>{date.getDate()}</strong>
+            </button>
+          );
+        })}
+      </div>
+
+      {monthOpen && (
+        <div className="month-picker" aria-label="Escolher dia do mês">
+          <div className="month-picker-header">
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">‹</button>
+            <strong>{monthLabel}</strong>
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="Próximo mês">›</button>
+          </div>
+          <div className="month-picker-weekdays" aria-hidden>
+            {['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].map((weekday) => (
+              <span key={weekday}>{weekday}</span>
+            ))}
+          </div>
+          <div className="month-picker-grid">
+            {monthDays.map((dateIso, index) => {
+              if (!dateIso) return <span key={`empty-${index}`} className="month-day month-day--empty" />;
+
+              const date = dateFromIso(dateIso);
+              const active = dateIso === selectedDate;
+              const isToday = dateIso === todayIso;
+
+              return (
+                <button
+                  key={dateIso}
+                  type="button"
+                  className={`month-day ${active ? 'month-day--active' : ''} ${isToday ? 'month-day--today' : ''}`}
+                  onClick={() => selectMonthDate(dateIso)}
+                  aria-pressed={active}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function getMonthCalendarDays(monthDate: Date): Array<string | null> {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const first = new Date(year, month, 1);
+  const leadingEmptyDays = first.getDay() === 0 ? 6 : first.getDay() - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<string | null> = Array.from({ length: leadingEmptyDays }, () => null);
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(isoToday(new Date(year, month, day)));
+  }
+
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return cells;
 }
 
 async function fetchWeather(latitude: number, longitude: number, source: WeatherSource): Promise<WeatherData> {

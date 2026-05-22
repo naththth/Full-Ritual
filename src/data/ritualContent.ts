@@ -227,17 +227,8 @@ export function getRoutineTasks(period: RoutinePeriod, area: RoutineArea, dateIs
   ];
 }
 
-const DEFAULT_MEAL_VARIANTS: Record<string, string[]> = {
-  intra: ['sem', 'sem', 'sem', 'sem', 'sem', 'sem', 'sem'],
-  breakfast: ['sub3', 'principal', 'sub1', 'principal', 'sub3', 'sub2', 'sub1'],
-  lunch: ['subProteina', 'principal', 'subArroz', 'principal', 'subProteina', 'principal', 'subArroz'],
-  snack: ['sub1', 'principal', 'sub2', 'principal', 'sub1', 'sub2', 'principal'],
-  dinner: ['subArroz', 'principal', 'subProteina', 'principal', 'subArroz', 'subProteina', 'principal'],
-};
-
-export function getDefaultMealVariant(mealId: string, dateIso: string) {
-  const day = weekdayFromIso(dateIso);
-  return DEFAULT_MEAL_VARIANTS[mealId]?.[day] ?? 'principal';
+export function getDefaultMealVariant(_mealId: string, _dateIso: string) {
+  return 'principal';
 }
 
 export function getMealItemsForDate(meal: MealPlan, dateIso: string) {

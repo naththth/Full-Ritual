@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
+import { isoToday } from '../lib/dates';
 import { useApp } from '../store/useStore';
+import { exerciseKey, exerciseTakesLoad, fetchWorkoutLoad, upsertWorkoutLoad } from '../lib/strengthLoads';
 import {
   INTENSITY_LABEL,
   MODALITY_LABEL,
@@ -29,6 +31,14 @@ import type {
 } from '../types';
 
 type View = 'loading' | 'empty' | 'onboarding' | 'plan' | 'no-supabase';
+
+type BodyDataCacheEntry = {
+  profile: TrainingProfile | null;
+  plan: TrainingPlan | null;
+  view: Extract<View, 'empty' | 'plan'>;
+};
+
+const bodyDataCache = new Map<string, BodyDataCacheEntry>();
 
 const DAY_ORDER: DayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -132,6 +142,7 @@ export function Body() {
   const [profile, setProfile] = useState<TrainingProfile | null>(null);
   const [plan, setPlan] = useState<TrainingPlan | null>(null);
   const [saving, setSaving] = useState(false);
+  const loadRequestId = useRef(0);
 
   useEffect(() => {
     if (!hasSupabase) {
@@ -142,36 +153,60 @@ export function Body() {
       setView('loading');
       return;
     }
-    void loadData(userId);
+    const cached = bodyDataCache.get(userId);
+    if (cached) {
+      setProfile(cached.profile);
+      setPlan(cached.plan);
+      setView(cached.view);
+    }
+    void loadData(userId, { silent: Boolean(cached) });
   }, [userId]);
 
-  async function loadData(uid: string) {
-    setView('loading');
-    const { data: profileData } = await supabase
-      .from('training_profile')
-      .select('*')
-      .eq('user_id', uid)
-      .maybeSingle();
+  async function loadData(uid: string, options: { silent?: boolean } = {}) {
+    const requestId = ++loadRequestId.current;
+    if (!options.silent) setView('loading');
 
-    if (!profileData) {
-      setProfile(null);
-      setPlan(null);
-      setView('empty');
-      return;
+    try {
+      const [profileResult, planResult] = await Promise.all([
+        supabase
+          .from('training_profile')
+          .select('*')
+          .eq('user_id', uid)
+          .maybeSingle(),
+        supabase
+          .from('training_plans')
+          .select('*')
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .order('week_start_date', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (requestId !== loadRequestId.current) return;
+      if (profileResult.error) throw profileResult.error;
+      if (planResult.error) throw planResult.error;
+
+      const nextProfile = (profileResult.data as TrainingProfile | null) ?? null;
+      const nextPlan = nextProfile ? ((planResult.data as TrainingPlan | null) ?? null) : null;
+      const nextView: BodyDataCacheEntry['view'] = nextProfile ? 'plan' : 'empty';
+
+      bodyDataCache.set(uid, {
+        profile: nextProfile,
+        plan: nextPlan,
+        view: nextView,
+      });
+      setProfile(nextProfile);
+      setPlan(nextPlan);
+      setView(nextView);
+    } catch (error) {
+      console.error('load training data', error);
+      if (!options.silent && requestId === loadRequestId.current) {
+        setProfile(null);
+        setPlan(null);
+        setView('empty');
+      }
     }
-    setProfile(profileData as TrainingProfile);
-
-    const { data: planData } = await supabase
-      .from('training_plans')
-      .select('*')
-      .eq('user_id', uid)
-      .eq('is_active', true)
-      .order('week_start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    setPlan((planData as TrainingPlan | null) ?? null);
-    setView('plan');
   }
 
   async function handleOnboardingComplete(
@@ -195,6 +230,7 @@ export function Body() {
       const weekStart = isoMondayOf(new Date());
       const planData = await createPlanWithFallback(savedProfile, weekStart, assignments, 'onboarding');
       setPlan(planData);
+      bodyDataCache.set(userId, { profile: savedProfile, plan: planData, view: 'plan' });
       setView('plan');
       showToast('plano de treino criado.');
     } catch (error) {
@@ -213,6 +249,7 @@ export function Body() {
       const existingAssignments = plan ? assignmentsFromPlan(plan.plan_json) : undefined;
       const planData = await createPlanWithFallback(profile, weekStart, existingAssignments, 'manual');
       setPlan(planData);
+      bodyDataCache.set(userId, { profile, plan: planData, view: 'plan' });
       showToast('plano refeito.');
     } catch (error) {
       console.error(error);
@@ -956,9 +993,10 @@ type FitAnalysis = {
 };
 
 function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, onRegenerate }: PlanViewProps) {
+  const goTo = useApp((s) => s.goTo);
   const days: TrainingDay[] = plan?.plan_json ?? [];
   const showToast = useApp((s) => s.showToast);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = isoToday();
   const [viewingDate, setViewingDate] = useState(todayIso);
   const activeWorkoutDate = viewingDate || selectedDate;
   const [fitUploading, setFitUploading] = useState(false);
@@ -1116,6 +1154,7 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
                       onToggle={(groupKey) => toggleTraining(d.day_index, groupKey)}
                       isToday={isToday}
                       getGroups={getGroups}
+                      userId={userId}
                     />
                   </>
                 )}
@@ -1183,6 +1222,16 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
           {saving ? 'replanejando…' : 'replanejar a semana'}
         </button>
       </div>
+
+      <button
+        type="button"
+        className="body-coach-fab"
+        onClick={() => goTo('body_coach')}
+        aria-label="abrir IA coach"
+      >
+        <span className="body-coach-fab__glyph" aria-hidden>✦</span>
+        <span className="body-coach-fab__label">IA coach</span>
+      </button>
     </div>
   );
 }
@@ -1372,7 +1421,7 @@ function modalityLabel(modality: TrainingModality | 'rest' | undefined) {
 }
 
 function TrainingSessionCard({
-  day, label, checks, onToggle, isToday, getGroups,
+  day, label, checks, onToggle, isToday, getGroups, userId,
 }: {
   day: TrainingDay;
   label: string;
@@ -1380,7 +1429,13 @@ function TrainingSessionCard({
   onToggle: (groupKey: string) => void;
   isToday: boolean;
   getGroups: (blocks: TrainingDay['blocks']) => TrainingGroup[];
+  userId: string | null;
 }) {
+  const isStrengthGroup = (label?: string) => {
+    if (!label) return false;
+    const t = label.toLowerCase();
+    return t.includes('musculação') || t.includes('musculacao') || t.includes('lpo') || t.includes('força') || t.includes('forca');
+  };
   const groups = getGroups(day.blocks ?? []);
 
   return (
@@ -1418,7 +1473,13 @@ function TrainingSessionCard({
                     <span className="training-section-title">{section.title}</span>
                     {section.duration && <span className="training-block-dur">{section.duration}</span>}
                   </div>
-                  <TrainingSectionText content={section.content} sectionId={section.id} />
+                  <TrainingSectionText
+                    content={section.content}
+                    sectionId={section.id}
+                    allowLoadInput={isStrengthGroup(group.label) && section.id === 'main'}
+                    userId={userId}
+                    date={day.date}
+                  />
                 </div>
               ))}
 
@@ -1484,7 +1545,15 @@ function trainingSectionBucket(title: string): 'warmup' | 'main' | 'cooldown' {
   return 'main';
 }
 
-function TrainingSectionText({ content, sectionId }: { content: string; sectionId: string }) {
+function TrainingSectionText({
+  content, sectionId, allowLoadInput = false, userId = null, date,
+}: {
+  content: string;
+  sectionId: string;
+  allowLoadInput?: boolean;
+  userId?: string | null;
+  date?: string;
+}) {
   const isMain = sectionId === 'main';
   const rows = trainingTextRows(content, { splitInline: !isMain, splitCompoundExercises: isMain });
 
@@ -1492,7 +1561,13 @@ function TrainingSectionText({ content, sectionId }: { content: string; sectionI
     <div className={isMain ? 'training-exercise-list' : 'training-section-content-list'}>
       {rows.map((row, index) => (
         isMain ? (
-          <TrainingExerciseRow key={`${row.slice(0, 20)}-${index}`} row={row} />
+          <TrainingExerciseRow
+            key={`${row.slice(0, 20)}-${index}`}
+            row={row}
+            allowLoadInput={allowLoadInput}
+            userId={userId}
+            date={date}
+          />
         ) : (
           <p
             key={`${row.slice(0, 20)}-${index}`}
@@ -1507,7 +1582,14 @@ function TrainingSectionText({ content, sectionId }: { content: string; sectionI
   );
 }
 
-function TrainingExerciseRow({ row }: { row: string }) {
+function TrainingExerciseRow({
+  row, allowLoadInput = false, userId = null, date,
+}: {
+  row: string;
+  allowLoadInput?: boolean;
+  userId?: string | null;
+  date?: string;
+}) {
   const parsed = parseTrainingExercise(row);
   if (!parsed) {
     return (
@@ -1517,6 +1599,12 @@ function TrainingExerciseRow({ row }: { row: string }) {
       </p>
     );
   }
+
+  const showLoad =
+    allowLoadInput &&
+    parsed.kind === 'exercise' &&
+    !!date &&
+    exerciseTakesLoad(parsed.title);
 
   return (
     <article className={`training-exercise-item training-exercise-item--${parsed.kind}`}>
@@ -1531,7 +1619,61 @@ function TrainingExerciseRow({ row }: { row: string }) {
           ))}
         </div>
       )}
+      {showLoad && (
+        <LoadField
+          title={parsed.title}
+          userId={userId}
+          date={date!}
+        />
+      )}
     </article>
+  );
+}
+
+function LoadField({
+  title, userId, date,
+}: {
+  title: string;
+  userId: string | null;
+  date: string;
+}) {
+  const storageKey = `full-ritual-load-${date}-${exerciseKey(title)}`;
+  const [value, setValue] = useLocalState<string>(storageKey, '');
+
+  useEffect(() => {
+    if (!userId || value) return;
+    let alive = true;
+    void fetchWorkoutLoad({ userId, date, title }).then((load) => {
+      if (!alive || !load?.load_kg) return;
+      setValue(String(load.load_kg));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [date, title, userId, value, setValue]);
+
+  const commit = () => {
+    const num = Number(value.replace(',', '.'));
+    if (!Number.isFinite(num) || num <= 0) return;
+    if (!userId) return;
+    void upsertWorkoutLoad({ userId, date, title, load_kg: num });
+  };
+
+  return (
+    <label className="training-exercise-load">
+      <span>carga</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step={0.5}
+        placeholder="kg"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+      />
+      <span className="training-exercise-load__unit">kg</span>
+    </label>
   );
 }
 

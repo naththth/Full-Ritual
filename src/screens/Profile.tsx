@@ -57,6 +57,56 @@ const SPIRIT: { value: SpiritTheme; label: string }[] = [
   { value: 'criatividade',    label: 'criatividade' },
 ];
 
+type SettingsIconKind = 'skincare' | 'library' | 'body';
+
+function SettingsIcon({ kind }: { kind: SettingsIconKind }) {
+  if (kind === 'skincare') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path d="M11.5 25.5h9" />
+        <path d="M13 11.5h6v14h-6z" />
+        <path d="M13.8 8.2h4.4v3.3h-4.4z" />
+        <path d="M14.7 6.2h2.6" />
+        <path d="M16 15.2c2 1.7 3 3.3 3 4.8a3 3 0 0 1-6 0c0-1.5 1-3.1 3-4.8Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'library') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path d="M9 8.2h6.2c1.3 0 2.4.4 3.1 1.2v16.4c-.7-.8-1.8-1.2-3.1-1.2H9z" />
+        <path d="M18.3 9.4c.7-.8 1.8-1.2 3.1-1.2H23v16.4h-1.6c-1.3 0-2.4.4-3.1 1.2" />
+        <path d="M12 12.8h3.2" />
+        <path d="M12 16.2h3.2" />
+        <path d="M21 12v6.5l1.3-1 1.3 1V12" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path d="M16 7.2v17.6" />
+      <path d="M11.2 10.8h9.6" />
+      <path d="M12.8 24.8h6.4" />
+      <path d="M9.2 13.2 6 20h6.4z" />
+      <path d="m22.8 13.2-3.2 6.8H26z" />
+      <path d="M7.8 20c.9 1.1 2.2 1.6 3.8 0" />
+      <path d="M21.2 20c.9 1.1 2.2 1.6 3.8 0" />
+    </svg>
+  );
+}
+
+function SettingsArrow() {
+  return (
+    <span className="settings-arrow" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M8.5 5.5 15 12l-6.5 6.5" />
+      </svg>
+    </span>
+  );
+}
+
 export function Profile() {
   const profile = useApp((s) => s.profile);
   const userId = useApp((s) => s.userId);
@@ -146,6 +196,10 @@ export function Profile() {
           music_prefs: payload.music_prefs,
           content_prefs: payload.content_prefs,
           spirit_themes: payload.spirit_themes,
+          target_weight_kg: current?.target_weight_kg ?? null,
+          target_weight_kg_max: current?.target_weight_kg_max ?? null,
+          target_body_fat_pct: current?.target_body_fat_pct ?? null,
+          target_date: current?.target_date ?? null,
           ai_enabled: current?.ai_enabled ?? true,
           notifications_enabled: current?.notifications_enabled ?? true,
           created_at: current?.created_at ?? new Date().toISOString(),
@@ -249,21 +303,29 @@ export function Profile() {
 
       <section className="card stack settings-card">
         <span className="eyebrow">configuração · app</span>
-        <button className="settings-row" onClick={() => goTo('products')}>
-          <span className="settings-mark">◌</span>
+        <button className="settings-row settings-row--skin" onClick={() => goTo('products')}>
+          <span className="settings-mark"><SettingsIcon kind="skincare" /></span>
           <span>
             <strong>Produtos e rotina skincare</strong>
             <small>cadastro, frequência e regeneração da ordem de uso</small>
           </span>
-          <i>→</i>
+          <SettingsArrow />
         </button>
-        <button className="settings-row" onClick={() => goTo('library')}>
-          <span className="settings-mark settings-mark--mind">○</span>
+        <button className="settings-row settings-row--mind" onClick={() => goTo('library')}>
+          <span className="settings-mark"><SettingsIcon kind="library" /></span>
           <span>
             <strong>Biblioteca e leitura</strong>
             <small>importar Goodreads, cadastrar livros e registrar páginas</small>
           </span>
-          <i>→</i>
+          <SettingsArrow />
+        </button>
+        <button className="settings-row settings-row--body" onClick={() => goTo('body_metrics')}>
+          <span className="settings-mark"><SettingsIcon kind="body" /></span>
+          <span>
+            <strong>Peso, altura e composição</strong>
+            <small>registrar medidas, foto pra IA analisar e ver evolução</small>
+          </span>
+          <SettingsArrow />
         </button>
       </section>
 

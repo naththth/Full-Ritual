@@ -103,8 +103,8 @@ export function Energy() {
 
   const duration = diffMinutes(bedtime, wakeTime);
   const dateLabel = relativeDateLabel(selectedDate);
-  const cycleStart = profile?.cycle_start ?? cyclePrefs.start;
-  const cycleLength = profile?.cycle_length ?? cyclePrefs.length;
+  const cycleStart = cyclePrefs.start || profile?.cycle_start || selectedDate;
+  const cycleLength = cyclePrefs.length || profile?.cycle_length || 28;
   const cycle = useMemo(() => {
     const selected = dateFromIso(selectedDate);
     const day = selected.getDay();
@@ -126,18 +126,24 @@ export function Energy() {
   }, [selectedDate]);
 
   useEffect(() => {
-    if (!profile?.cycle_start) return;
-    if (
-      cyclePrefs.start === profile.cycle_start &&
-      cyclePrefs.length === (profile.cycle_length ?? 28) &&
-      cyclePrefs.tracking === profile.cycle_tracking
-    ) return;
-    setCyclePrefs({
-      start: profile.cycle_start,
-      length: profile.cycle_length ?? 28,
-      tracking: profile.cycle_tracking,
+    const profileCycleStart = profile?.cycle_start;
+    if (!profileCycleStart) return;
+    setCyclePrefs((current) => {
+      const next = {
+        start: profileCycleStart,
+        length: profile.cycle_length ?? 28,
+        tracking: profile.cycle_tracking,
+      };
+
+      if (
+        current.start === next.start &&
+        current.length === next.length &&
+        current.tracking === next.tracking
+      ) return current;
+
+      return next;
     });
-  }, [cyclePrefs.length, cyclePrefs.start, cyclePrefs.tracking, profile?.cycle_length, profile?.cycle_start, profile?.cycle_tracking]);
+  }, [profile?.cycle_length, profile?.cycle_start, profile?.cycle_tracking]);
 
   const setCheckinField = <K extends keyof EnergyCheckin>(field: K, value: EnergyCheckin[K]) => {
     setCheckin((current) => ({ ...normalizeCheckin(current), [field]: value }));
