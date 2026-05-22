@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon3D, type Icon3DKind } from '../components/Icon3D';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
@@ -43,11 +44,11 @@ const bodyDataCache = new Map<string, BodyDataCacheEntry>();
 
 const DAY_ORDER: DayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-const MODALITY_OPTIONS: { id: TrainingModality; label: string; glyph: string; hint: string }[] = [
-  { id: 'corrida', label: 'corrida', glyph: '↗', hint: 'rua ou esteira' },
-  { id: 'pedal', label: 'pedal', glyph: '○', hint: 'road, mtb, indoor' },
-  { id: 'musculacao', label: 'musculação', glyph: '⚒', hint: 'força e hipertrofia' },
-  { id: 'lpo', label: 'LPO', glyph: '✦', hint: 'levantamento olímpico · sábado 9h' },
+const MODALITY_OPTIONS: { id: TrainingModality; label: string; icon: Icon3DKind; hint: string }[] = [
+  { id: 'corrida', label: 'corrida', icon: 'running', hint: 'rua ou esteira' },
+  { id: 'pedal', label: 'pedal', icon: 'cycling', hint: 'road, mtb, indoor' },
+  { id: 'musculacao', label: 'musculação', icon: 'lifting', hint: 'força e hipertrofia' },
+  { id: 'lpo', label: 'LPO', icon: 'olympic', hint: 'levantamento olímpico · sábado 9h' },
 ];
 
 const PREFERRED_TIME_OPTIONS: { id: PreferredTime; label: string }[] = [
@@ -544,7 +545,7 @@ function StepModalities({
               className={`modality-card${active ? ' modality-card--active' : ''}`}
               onClick={() => onToggle(m.id)}
             >
-              <span className="modality-glyph">{m.glyph}</span>
+              <Icon3D kind={m.icon} size={38} />
               <div>
                 <strong>{m.label}</strong>
                 <small>{m.hint}</small>

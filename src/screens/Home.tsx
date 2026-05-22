@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Icon3D } from '../components/Icon3D';
 import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, isoToday, lastDays, relativeDateLabel, weekDaysAround } from '../lib/dates';
@@ -355,28 +356,28 @@ export function Home() {
         <span className="eyebrow">saúde · acessar</span>
         <div className="home-health-card">
           <button className="home-health-pill" onClick={() => goTo('labs')}>
-            <span className="home-health-pill-icon" style={{ color: 'var(--mind)' }}>◐</span>
+            <Icon3D kind="labs" size={36} />
             <div className="home-health-pill-text">
               <strong>Exames</strong>
               <span>laudos e marcadores</span>
             </div>
           </button>
           <button className="home-health-pill" onClick={() => goTo('supplements')}>
-            <span className="home-health-pill-icon" style={{ color: 'var(--diet)' }}>◍</span>
+            <Icon3D kind="supplements" size={36} />
             <div className="home-health-pill-text">
               <strong>Suplementos</strong>
               <span>aderência diária</span>
             </div>
           </button>
           <button className="home-health-pill" onClick={() => goTo('vitals')}>
-            <span className="home-health-pill-icon" style={{ color: 'var(--body)' }}>◑</span>
+            <Icon3D kind="vitals" size={36} />
             <div className="home-health-pill-text">
               <strong>Sinais vitais</strong>
               <span>FC, HRV, passos</span>
             </div>
           </button>
           <button className="home-health-pill" onClick={() => goTo('pain')}>
-            <span className="home-health-pill-icon" style={{ color: 'var(--spirit)' }}>○</span>
+            <Icon3D kind="pain" size={36} />
             <div className="home-health-pill-text">
               <strong>Dor e lesões</strong>
               <span>registro e evolução</span>

@@ -208,7 +208,7 @@ export function Labs() {
               <span className="labs-spinner" />
               analisando laudo...
             </span>
-          ) : '◐ enviar foto do laudo'}
+          ) : '+ enviar foto do laudo'}
         </button>
       </section>
 
