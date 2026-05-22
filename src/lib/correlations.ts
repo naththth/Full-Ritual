@@ -1,4 +1,5 @@
-import type { Checkin, DailyScore, SleepLog } from '../types';
+import { dimensionLabels, normalizeActiveDimensions } from './dimensions';
+import type { Checkin, DailyScore, DimensionKey, SleepLog } from '../types';
 
 export interface CorrelationInsight {
   title: string;
@@ -10,18 +11,22 @@ export function buildAutomaticCorrelations({
   sleepLogs,
   checkins,
   scores,
+  activeDimensions,
 }: {
   sleepLogs: SleepLog[];
   checkins: Checkin[];
   scores: DailyScore[];
+  activeDimensions?: DimensionKey[];
 }): CorrelationInsight[] {
   const insights: CorrelationInsight[] = [];
+  const active = normalizeActiveDimensions(activeDimensions);
+  const hasDimension = (key: DimensionKey) => active.includes(key);
 
   const sleepByDate = new Map(sleepLogs.map((s) => [s.date, s]));
   const checkinsWithSleep = checkins.filter((c) => sleepByDate.get(c.date)?.duration_min);
 
   // Sono < 6h → pele reativa
-  if (checkinsWithSleep.length >= 3) {
+  if (hasDimension('skin') && checkinsWithSleep.length >= 3) {
     const shortSleepSkin = checkinsWithSleep.filter((c) => {
       const sleep = sleepByDate.get(c.date);
       return (sleep?.duration_min ?? 0) < 360 && c.skin_state <= 5;
@@ -71,7 +76,7 @@ export function buildAutomaticCorrelations({
 
   // Desequilíbrio corpo/mente
   const activeDays = scores.filter((s) => s.score_mind > 0 && s.score_body > 0);
-  if (activeDays.length >= 5) {
+  if (hasDimension('body') && hasDimension('mind') && activeDays.length >= 5) {
     const avgMind = average(activeDays.map((s) => s.score_mind));
     const avgBody = average(activeDays.map((s) => s.score_body));
     const diff = avgBody - avgMind;
@@ -89,7 +94,7 @@ export function buildAutomaticCorrelations({
 
   // Dieta irregular
   const dietDays = scores.filter((s) => s.score_diet > 0);
-  if (dietDays.length >= 5) {
+  if (hasDimension('diet') && dietDays.length >= 5) {
     const avgDiet = average(dietDays.map((s) => s.score_diet));
     const dietVariance = variance(dietDays.map((s) => s.score_diet));
     insights.push({
@@ -121,7 +126,7 @@ export function buildAutomaticCorrelations({
   // Espírito alto → energia alta no mesmo dia
   const spiritAndEnergy = scores.filter((s) => s.score_spirit > 70);
   const matchingCheckins = spiritAndEnergy.map((s) => checkins.find((c) => c.date === s.date)).filter(Boolean);
-  if (matchingCheckins.length >= 3) {
+  if (hasDimension('spirit') && matchingCheckins.length >= 3) {
     const highEnergy = matchingCheckins.filter((c) => (c?.energy ?? 0) >= 7);
     const strength = highEnergy.length / matchingCheckins.length;
     if (strength >= 0.55) {
@@ -136,7 +141,7 @@ export function buildAutomaticCorrelations({
   if (!insights.length) {
     insights.push({
       title: 'Primeira leitura',
-      body: 'Registre sono, pele, treino e refeições por alguns dias. As correlações aparecem quando o ritual deixa rastro.',
+      body: `Registre sono, energia e ${dimensionLabels(active)} por alguns dias. As correlações aparecem quando o ritual deixa rastro.`,
       strength: 0.2,
     });
   }

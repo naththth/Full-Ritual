@@ -3,10 +3,11 @@ import { Icon3D } from '../components/Icon3D';
 import { QUOTES, ROUTINES, getRoutineTasks } from '../data/ritualContent';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, isoToday, lastDays, relativeDateLabel, weekDaysAround } from '../lib/dates';
+import { normalizeActiveDimensions } from '../lib/dimensions';
 import { resolveInsightText } from '../lib/insightText';
 import { readJson } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { type DailyScore, type DimensionKey, type Insight } from '../types';
+import { DIMENSIONS, type DailyScore, type DimensionKey, type Insight } from '../types';
 import { useApp } from '../store/useStore';
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -98,6 +99,7 @@ type WeatherData = {
 };
 
 type WeatherCare = {
+  key: DimensionKey | 'health';
   label: string;
   text: string;
 };
@@ -111,6 +113,8 @@ export function Home() {
   const profile = useApp((s) => s.profile);
   const sexo = useApp((s) => s.sexo);
   const userId = useApp((s) => s.userId);
+  const selectedDimensions = useApp((s) => s.activeDimensions);
+  const activeDimensions = useMemo(() => normalizeActiveDimensions(selectedDimensions), [selectedDimensions]);
   const goTo = useApp((s) => s.goTo);
   const selectedDate = useApp((s) => s.selectedDate);
   const setSelectedDate = useApp((s) => s.setSelectedDate);
@@ -143,12 +147,12 @@ export function Home() {
     };
   }, [dailyScore, selectedDate]);
   const energyFromCheckin = readLocal<{ energy?: number }>(`full-ritual-energy-${selectedDate}`, {}).energy;
+  const activeScoreAverage = activeDimensions.reduce((sum, key) => sum + scores[key], 0) / activeDimensions.length;
   const energyScoreNorm = typeof energyFromCheckin === 'number'
     ? Math.max(0, Math.min(1, energyFromCheckin / 10))
-    : scores.body;
-  const totalScore = Math.round(
-    ((scores.skin + scores.body + scores.mind + scores.diet + scores.spirit + energyScoreNorm) / 6) * 100,
-  );
+    : activeDimensions.includes('body') ? scores.body : activeScoreAverage;
+  const totalInputs = [...activeDimensions.map((key) => scores[key]), energyScoreNorm];
+  const totalScore = Math.round((totalInputs.reduce((sum, value) => sum + value, 0) / totalInputs.length) * 100);
 
   const sleepMin = useMemo(() => {
     const logs = readLocal<Array<{ date: string; duration_min: number | null }>>('full-ritual-sleep', []);
@@ -161,12 +165,12 @@ export function Home() {
 
   const energyValue = typeof energyFromCheckin === 'number'
     ? energyFromCheckin
-    : dailyScore ? Math.round(scores.body * 10) : null;
+    : dailyScore ? Math.round(energyScoreNorm * 10) : null;
   const energyLabel = energyValue !== null ? `${energyValue}/10` : '—';
 
   const dailyInsight = useMemo(
-    () => buildDailyInsight(sleepMin, profile?.cycle_tracking && sexo !== 'masculino' ? cycle : null, latestInsight, profile?.name),
-    [sleepMin, cycle, latestInsight, profile?.name, profile?.cycle_tracking, sexo],
+    () => buildDailyInsight(sleepMin, profile?.cycle_tracking && sexo !== 'masculino' ? cycle : null, latestInsight, profile?.name, activeDimensions),
+    [sleepMin, cycle, latestInsight, profile?.name, profile?.cycle_tracking, sexo, activeDimensions],
   );
 
   const openDimension = (key: DimensionKey) => {
@@ -188,6 +192,21 @@ export function Home() {
     }
     goTo('spirit', key);
   };
+
+  const presencePetals = useMemo<Petal[]>(() => {
+    const dimensionPetals = activeDimensions.map((key) => ({
+      key,
+      label: DIMENSIONS[key].label,
+      color: cssVarColor(DIMENSIONS[key].color),
+      value: scores[key],
+      onClick: () => openDimension(key),
+    }));
+
+    return [
+      ...dimensionPetals,
+      { key: 'energy', label: 'Energia', color: '#E8A23B', value: energyScoreNorm, onClick: () => goTo('energy') },
+    ];
+  }, [activeDimensions, energyScoreNorm, goTo, scores]);
 
   const loadFallbackWeather = async (message: string) => {
     const fallbackWeather = await fetchWeather(FALLBACK_WEATHER_COORDS.latitude, FALLBACK_WEATHER_COORDS.longitude, 'fallback');
@@ -292,14 +311,7 @@ export function Home() {
       <section className="card presence-card">
         <span className="eyebrow" style={{ alignSelf: 'flex-start' }}>presença · {shortDateLabel}</span>
         <PresenceFlower
-          petals={[
-            { key: 'skin', label: 'Pele', color: '#E07A55', value: scores.skin, onClick: () => openDimension('skin') },
-            { key: 'body', label: 'Corpo', color: '#D9501A', value: scores.body, onClick: () => openDimension('body') },
-            { key: 'energy', label: 'Energia', color: '#E8A23B', value: energyScoreNorm, onClick: () => goTo('energy') },
-            { key: 'diet', label: 'Dieta', color: '#5B7A38', value: scores.diet, onClick: () => openDimension('diet') },
-            { key: 'spirit', label: 'Espírito', color: '#6B2856', value: scores.spirit, onClick: () => openDimension('spirit') },
-            { key: 'mind', label: 'Mente', color: '#0E5B6E', value: scores.mind, onClick: () => openDimension('mind') },
-          ]}
+          petals={presencePetals}
           totalScore={totalScore}
         />
       </section>
@@ -345,6 +357,7 @@ export function Home() {
         weather={weather}
         loading={weatherLoading}
         error={weatherError}
+        activeDimensions={activeDimensions}
         onRefresh={loadWeather}
       />
 
@@ -414,6 +427,19 @@ const PETAL_DEEP: Record<string, string> = {
   '#0E5B6E': '#062F3B',
 };
 
+const DIMENSION_PETAL_COLORS: Record<DimensionKey, string> = {
+  skin: '#E07A55',
+  body: '#D9501A',
+  mind: '#0E5B6E',
+  diet: '#5B7A38',
+  spirit: '#6B2856',
+};
+
+function cssVarColor(color: string) {
+  const match = Object.entries(DIMENSIONS).find(([, dimension]) => dimension.color === color);
+  return match ? DIMENSION_PETAL_COLORS[match[0] as DimensionKey] : color;
+}
+
 type Petal = {
   key: string;
   label: string;
@@ -428,16 +454,17 @@ function PresenceFlower({ petals, totalScore }: { petals: Petal[]; totalScore: n
   const cy = size / 2;
   const outerR = 110;
   const innerR = 40;
+  const petalCount = Math.max(3, petals.length);
   const ink = 'rgba(74,44,34,0.32)';
   const inkSoft = 'rgba(74,44,34,0.14)';
 
   const pointAt = (i: number, r: number) => {
-    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const a = (i / petalCount) * Math.PI * 2 - Math.PI / 2;
     return [cx + Math.cos(a) * r, cy + Math.sin(a) * r] as const;
   };
 
-  const hexPath = (r: number) =>
-    Array.from({ length: 6 })
+  const polygonPath = (r: number) =>
+    Array.from({ length: petalCount })
       .map((_, i) => {
         const [x, y] = pointAt(i, r);
         return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
@@ -455,9 +482,9 @@ function PresenceFlower({ petals, totalScore }: { petals: Petal[]; totalScore: n
         aria-label={`presença ${totalScore} de 100`}
       >
         {/* outer + mid hex frames */}
-        <path d={hexPath(outerR)} fill="none" stroke={ink} strokeWidth={0.8} />
-        <path d={hexPath(outerR * 0.66)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
-        <path d={hexPath(outerR * 0.33)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
+        <path d={polygonPath(outerR)} fill="none" stroke={ink} strokeWidth={0.8} />
+        <path d={polygonPath(outerR * 0.66)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
+        <path d={polygonPath(outerR * 0.33)} fill="none" stroke={inkSoft} strokeWidth={0.6} />
 
         {/* full spokes (hairline) */}
         {petals.map((p, i) => {
@@ -733,14 +760,16 @@ function WeatherCard({
   weather,
   loading,
   error,
+  activeDimensions,
   onRefresh,
 }: {
   weather: WeatherData | null;
   loading: boolean;
   error: string | null;
+  activeDimensions: DimensionKey[];
   onRefresh: () => void;
 }) {
-  const care = weather ? weatherCare(weather) : [];
+  const care = weather ? weatherCare(weather, activeDimensions) : [];
 
   return (
     <section className="card weather-card">
@@ -755,7 +784,7 @@ function WeatherCard({
       </div>
 
       <p className="weather-title">
-        {weather ? weatherHeadline(weather) : 'Temperatura, umidade e UV ajustam pele, água, treino e descanso.'}
+        {weather ? weatherHeadline(weather, activeDimensions) : weatherEmptyText(activeDimensions)}
       </p>
 
       {weather && (
@@ -787,31 +816,54 @@ function WeatherCard({
   );
 }
 
-function weatherHeadline(weather: WeatherData) {
-  if (weather.temp >= 29 && weather.humidity < 45) {
-    return 'Calor seco: pele perde água mais rápido e o treino pede reposição antes de pedir intensidade.';
-  }
-  if (weather.temp >= 27) {
-    return 'Dia quente: suor, oleosidade e energia oscilam. Água e limpeza suave entram como base.';
-  }
-  if (weather.temp <= 14) {
-    return 'Dia frio: banho morno, barreira protegida e refeições mais quentes ajudam o corpo a entrar no ritmo.';
-  }
-  if (weather.humidity >= 75) {
-    return 'Umidade alta: pele pode ficar mais reativa a suor e óleo. Rotina leve ganha importância.';
-  }
-  return 'Clima estável: bom dia para manter rotina sem compensar no café, treino ou skincare.';
+function weatherEmptyText(activeDimensions: DimensionKey[]) {
+  const targets = [
+    activeDimensions.includes('skin') ? 'pele' : null,
+    activeDimensions.includes('diet') ? 'água' : null,
+    activeDimensions.includes('body') ? 'treino' : null,
+    activeDimensions.includes('mind') || activeDimensions.includes('spirit') ? 'descanso' : null,
+  ].filter(Boolean);
+  return `Temperatura, umidade e UV ajustam ${targets.length ? targets.join(', ') : 'energia'} hoje.`;
 }
 
-function weatherCare(weather: WeatherData): WeatherCare[] {
+function weatherHeadline(weather: WeatherData, activeDimensions: DimensionKey[]) {
+  const hasSkin = activeDimensions.includes('skin');
+  const hasDiet = activeDimensions.includes('diet');
+  const hasBody = activeDimensions.includes('body');
+
+  if (weather.temp >= 29 && weather.humidity < 45) {
+    if (hasSkin && hasBody) return 'Calor seco: pele perde água mais rápido e o treino pede reposição antes de pedir intensidade.';
+    if (hasSkin) return 'Calor seco: a pele perde água mais rápido. Barreira e hidratação sobem de prioridade.';
+    if (hasBody) return 'Calor seco: reposição e horários mais gentis importam mais que intensidade.';
+    return 'Calor seco: água, pausas e percepção de esforço precisam guiar o ritmo.';
+  }
+  if (weather.temp >= 27) {
+    if (hasSkin && hasDiet) return 'Dia quente: suor, oleosidade e energia oscilam. Água e limpeza suave entram como base.';
+    if (hasDiet) return 'Dia quente: água e refeições mais úmidas ajudam a energia a oscilar menos.';
+    return 'Dia quente: observe suor, sede e energia antes de aumentar cobrança.';
+  }
+  if (weather.temp <= 14) {
+    if (hasSkin && hasDiet) return 'Dia frio: banho morno, barreira protegida e refeições mais quentes ajudam o corpo a entrar no ritmo.';
+    return 'Dia frio: aquecimento, refeições quentes e entrada gradual ajudam o corpo a entrar no ritmo.';
+  }
+  if (hasSkin && weather.humidity >= 75) {
+    return 'Umidade alta: pele pode ficar mais reativa a suor e óleo. Rotina leve ganha importância.';
+  }
+  if (hasSkin && hasBody) return 'Clima estável: bom dia para manter rotina sem compensar no café, treino ou skincare.';
+  if (hasBody) return 'Clima estável: bom dia para manter movimento e energia sem compensações.';
+  return 'Clima estável: bom dia para manter presença sem compensações.';
+}
+
+function weatherCare(weather: WeatherData, activeDimensions: DimensionKey[]): WeatherCare[] {
   const hot = weather.temp >= 27;
   const cold = weather.temp <= 14;
   const dry = weather.humidity < 45;
   const humid = weather.humidity >= 75;
   const highUv = weather.uv >= 6;
 
-  return [
+  const care: WeatherCare[] = [
     {
+      key: 'skin',
       label: 'pele',
       text: highUv
         ? 'FPS 50 e reaplicação. Evite ácido forte se a pele já estiver sensibilizada.'
@@ -822,6 +874,7 @@ function weatherCare(weather: WeatherData): WeatherCare[] {
             : 'Barreira estável: mantenha o plano sem aumentar ativos só porque o dia parece calmo.',
     },
     {
+      key: 'diet',
       label: 'dieta',
       text: hot || dry
         ? 'Água sobe de prioridade. Inclua sal mineral natural, fruta ou refeição mais úmida.'
@@ -830,7 +883,8 @@ function weatherCare(weather: WeatherData): WeatherCare[] {
           : 'Plano normal: proteína, cor no prato e água distribuída ao longo do dia.',
     },
     {
-      label: 'saúde',
+      key: 'body',
+      label: 'corpo',
       text: hot
         ? 'Treino funciona melhor cedo ou mais leve. Observe suor, dor de cabeça e sede.'
         : cold
@@ -838,12 +892,15 @@ function weatherCare(weather: WeatherData): WeatherCare[] {
           : 'Intensidade pode seguir planejada. Use energia real do corpo como métrica.',
     },
     {
+      key: 'spirit',
       label: 'espírito',
       text: dry || hot
         ? 'Pausas curtas de respiração ajudam a não transformar desconforto físico em irritação.'
         : 'Use o clima como âncora: intenção simples, menos pressa e fechamento do dia mais limpo.',
     },
   ];
+
+  return care.filter((item) => item.key === 'health' || activeDimensions.includes(item.key));
 }
 
 function phaseLabel(phase: string) {
@@ -861,35 +918,49 @@ function buildDailyInsight(
   cycle: { phase: string; day: number } | null,
   fallback: { title: string; body: string } | null,
   profileName?: string | null,
+  activeDimensions: DimensionKey[] = normalizeActiveDimensions(null),
 ): { title: string; body: string } {
   const shortSleep = sleepMin !== null && sleepMin < 360;
   const goodSleep = sleepMin !== null && sleepMin >= 420;
+  const hasSkin = activeDimensions.includes('skin');
+  const hasBody = activeDimensions.includes('body');
+  const hasDiet = activeDimensions.includes('diet');
   const phase = cycle?.phase;
   const day = cycle?.day;
 
   if (phase === 'menstrual' && shortSleep) return {
     title: 'Recuperação dupla: fase e sono curto.',
-    body: 'Reduza estímulos e ativos fortes. Priorize barreira, hidratação e leveza.',
+    body: hasSkin
+      ? 'Reduza estímulos e ativos fortes. Priorize barreira, hidratação e leveza.'
+      : 'Reduza estímulos e cobrança. Priorize hidratação, comida simples e leveza.',
   };
   if (phase === 'menstrual') return {
     title: `Dia ${day} — fase menstrual.`,
-    body: 'Corpo em renovação. Rituais lentos, textura leve e menos cobrança hoje.',
+    body: 'Corpo em renovação. Rituais lentos e menos cobrança hoje.',
   };
   if (phase === 'folicular' && goodSleep) return {
     title: 'Energia em ascensão, sono bem usado.',
-    body: 'Janela ideal para rotina completa, ativos como vitamina C e movimento.',
+    body: hasSkin && hasBody
+      ? 'Janela ideal para rotina completa, ativos como vitamina C e movimento.'
+      : hasBody
+        ? 'Janela ideal para movimento, progressão e execução mais completa.'
+        : 'Janela ideal para retomar constância com clareza e menos atrito.',
   };
   if (phase === 'folicular') return {
     title: `Dia ${day} — fase folicular.`,
-    body: 'Corpo em reconstrução. Mantenha consistência: proteína, sono e rotina.',
+    body: `Corpo em reconstrução. Mantenha consistência: ${hasDiet ? 'proteína, ' : ''}sono e rotina.`,
   };
   if (phase === 'ovulatoria') return {
     title: 'Pico energético do ciclo.',
-    body: 'Melhor momento para ativos mais fortes, treino intenso e presença total.',
+    body: hasSkin && hasBody
+      ? 'Melhor momento para ativos mais fortes, treino intenso e presença total.'
+      : 'Melhor momento para presença total e tarefas que pedem mais energia.',
   };
   if (phase === 'lutea' && shortSleep) return {
     title: 'Fase lútea com sono curto.',
-    body: 'Sensibilidade da pele elevada. Hidratação, menos ácidos e mais descanso.',
+    body: hasSkin
+      ? 'Sensibilidade da pele elevada. Hidratação, menos ácidos e mais descanso.'
+      : 'Sensibilidade mais alta. Menos estímulo, mais descanso e execução simples.',
   };
   if (phase === 'lutea') return {
     title: `Dia ${day} — fase lútea.`,
@@ -897,7 +968,9 @@ function buildDailyInsight(
   };
   if (shortSleep) return {
     title: 'Sono abaixo do ideal.',
-    body: 'Pele reativa e barreira fragilizada. Produtos reparadores e rotina leve.',
+    body: hasSkin
+      ? 'Pele reativa e barreira fragilizada. Produtos reparadores e rotina leve.'
+      : 'Energia e foco podem oscilar. Faça o essencial com margem para descansar.',
   };
   return {
     title: fallback?.title ?? 'Presença primeiro, performance depois.',

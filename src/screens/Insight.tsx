@@ -4,15 +4,18 @@ import CircleButton from '../components/CircleButton';
 import { Ring } from '../components/Ring';
 import { buildAutomaticCorrelations, correlationsToText, type CorrelationInsight } from '../lib/correlations';
 import { isoToday, lastDays, minutesToSleepLabel } from '../lib/dates';
+import { dimensionScoreField, normalizeActiveDimensions } from '../lib/dimensions';
 import { resolveInsightText } from '../lib/insightText';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { DIMENSIONS, type Checkin, type DailyScore, type DimensionKey, type Insight as InsightRow, type SleepLog } from '../types';
+import { DIMENSIONS, type Checkin, type DailyScore, type Insight as InsightRow, type SleepLog } from '../types';
 import { useApp } from '../store/useStore';
 
 export function Insight() {
   const goTo = useApp((s) => s.goTo);
   const userId = useApp((s) => s.userId);
   const profile = useApp((s) => s.profile);
+  const selectedDimensions = useApp((s) => s.activeDimensions);
+  const activeDimensions = useMemo(() => normalizeActiveDimensions(selectedDimensions), [selectedDimensions]);
   const showToast = useApp((s) => s.showToast);
   const [insights, setInsights] = useState<InsightRow[]>([]);
   const [scores, setScores] = useState<DailyScore[]>([]);
@@ -46,12 +49,16 @@ export function Insight() {
     setGeneratingAi(true);
     try {
       const currentScores = scores.length ? scores : makeWeekScores(userId);
-      const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: currentScores });
+      const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: currentScores, activeDimensions });
+      const scoreSummary = activeDimensions
+        .map((key) => `${DIMENSIONS[key].label.toLowerCase()} ${avgScore(currentScores, dimensionScoreField(key))}`)
+        .join(' | ');
       const context = [
         `Data: ${isoToday()}`,
         `Sono médio 14 dias: ${avgSleep ? minutesToSleepLabel(avgSleep) : 'sem dados'}`,
         `Correlações detectadas:\n${correlationsToText(correlations)}`,
-        `Scores médios: pele ${avgScore(scores, 'score_skin')} | corpo ${avgScore(scores, 'score_body')} | mente ${avgScore(scores, 'score_mind')} | dieta ${avgScore(scores, 'score_diet')} | espírito ${avgScore(scores, 'score_spirit')}`,
+        `Dimensões ativas: ${activeDimensions.map((key) => DIMENSIONS[key].label).join(', ')}`,
+        `Scores médios: ${scoreSummary}`,
       ].join('\n');
 
       const { data, error } = await supabase.functions.invoke('gemini-chat', {
@@ -88,7 +95,7 @@ export function Insight() {
 
   const fallbackScores = useMemo(() => makeWeekScores(userId ?? 'local'), [userId]);
   const visibleScores = scores.length ? scores : fallbackScores;
-  const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: visibleScores });
+  const correlations = buildAutomaticCorrelations({ sleepLogs, checkins, scores: visibleScores, activeDimensions });
   const primaryInsight = insights[0] ?? fallbackInsight(correlations[0]);
   const primaryInsightBody = resolveInsightText(primaryInsight.body, profile?.name);
   const aiHistory = insights
@@ -131,11 +138,12 @@ export function Insight() {
                 contentStyle={{ background: 'var(--chocolate)', border: 'none', borderRadius: 12, color: 'var(--ivory)', fontSize: 11 }}
                 cursor={{ stroke: 'rgba(74,44,34,0.18)' }}
               />
-              {(['skin', 'body', 'mind', 'diet', 'spirit'] as DimensionKey[]).map((key) => (
+              {activeDimensions.map((key) => (
                 <Line
                   key={key}
                   type="monotone"
                   dataKey={key}
+                  name={DIMENSIONS[key].label}
                   stroke={DIMENSIONS[key].color}
                   strokeWidth={1.8}
                   dot={false}
