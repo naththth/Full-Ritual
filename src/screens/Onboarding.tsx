@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { supabase, hasSupabase } from '../lib/supabase';
+import { scopedStorageKey, writeJson } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import type {
   ContentPref, DimensionKey, MusicPref, SkinType, SportModality, SpiritTheme,
@@ -278,6 +279,7 @@ export function Onboarding() {
 
   // dieta
   const [goalWaterL, setGoalWaterL] = useState<number | ''>(2.5);
+  const [dietSetupMode, setDietSetupMode] = useState<'existing_plan' | 'needs_ai_nutri' | null>(null);
 
   // espírito
   const [spiritThemes, setSpiritThemes] = useState<SpiritTheme[]>([]);
@@ -317,6 +319,7 @@ export function Onboarding() {
     if (step === 'nome') return name.trim().length > 0;
     if (step === 'sexo') return sexo !== null;
     if (step === 'dimensoes') return dims.length > 0;
+    if (step === 'dieta') return dietSetupMode !== null;
     return true; // restantes opcionais
   };
 
@@ -393,12 +396,37 @@ export function Onboarding() {
           });
         }
       }
+
+      if (dims.includes('diet') && dietSetupMode) {
+        await supabase.from('diet_plans').upsert({
+          user_id: userId,
+          manual_foods: [],
+          pdf_url: null,
+          pdf_name: null,
+          notes: null,
+          setup_mode: dietSetupMode,
+          nutri_configured: false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      }
     } else {
       setProfile({
         ...profilePayload,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as Parameters<typeof setProfile>[0]);
+
+      if (dims.includes('diet') && dietSetupMode) {
+        writeJson(scopedStorageKey('full-ritual-diet-plan', userId), {
+          manualFoods: [],
+          pdfUrl: null,
+          pdfName: null,
+          notes: '',
+          setupMode: dietSetupMode,
+          nutriProfile: {},
+          nutriConfigured: false,
+        });
+      }
     }
 
     setSaving(false);
@@ -571,6 +599,22 @@ export function Onboarding() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <p style={sub}>Vamos acompanhar sua hidratação e refeições.</p>
         <NumericInput label="Meta de água" value={goalWaterL} onChange={setGoalWaterL} unit="litros/dia" min={0.5} max={6} step={0.25} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <CardOption
+            label="Já possuo uma dieta"
+            hint="ao entrar no app, você poderá subir o PDF ou inserir manualmente"
+            active={dietSetupMode === 'existing_plan'}
+            color={c}
+            onClick={() => setDietSetupMode('existing_plan')}
+          />
+          <CardOption
+            label="Não possuo dieta"
+            hint="a dimensão Dieta vai abrir um formulário para configurar o IA Nutri"
+            active={dietSetupMode === 'needs_ai_nutri'}
+            color={c}
+            onClick={() => setDietSetupMode('needs_ai_nutri')}
+          />
+        </div>
       </div>
     );
 

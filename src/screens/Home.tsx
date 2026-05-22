@@ -5,7 +5,7 @@ import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, isoToday, lastDays, relativeDateLabel, weekDaysAround } from '../lib/dates';
 import { normalizeActiveDimensions } from '../lib/dimensions';
 import { resolveInsightText } from '../lib/insightText';
-import { readJson } from '../lib/storage';
+import { readJson, scopedStorageKey } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { DIMENSIONS, type DailyScore, type DimensionKey, type Insight } from '../types';
 import { useApp } from '../store/useStore';
@@ -27,9 +27,9 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function computeLocalScores(date: string): Record<DimensionKey, number> {
+function computeLocalScores(date: string, userId: string | null): Record<DimensionKey, number> {
   // Skin: % de tarefas do ritual marcadas no período dia
-  const checks = readLocal<Record<string, boolean>>(`full-ritual-routine-checks-${date}`, {});
+  const checks = readLocal<Record<string, boolean>>(scopedStorageKey(`full-ritual-routine-checks-${date}`, userId), {});
   const skinTotal =
     getRoutineTasks('day', 'face', date).length +
     ROUTINES.day.body.length +
@@ -38,7 +38,7 @@ function computeLocalScores(date: string): Record<DimensionKey, number> {
 
   // Spirit: campos preenchidos. Humor/tema têm valores padrão e não devem inflar o score inicial.
   const spirit = readLocal<{ intention?: unknown; relief?: unknown; gratitude?: unknown }>(
-    `full-ritual-spirit-${date}`,
+    scopedStorageKey(`full-ritual-spirit-${date}`, userId),
     { intention: '', relief: '', gratitude: '' },
   );
   const spiritScore =
@@ -46,7 +46,7 @@ function computeLocalScores(date: string): Record<DimensionKey, number> {
 
   // Diet: água (0-6 copos) + refeições registradas (0-3)
   const diet = readLocal<{ water?: unknown; meals?: unknown }>(
-    `full-ritual-diet-${date}`,
+    scopedStorageKey(`full-ritual-diet-${date}`, userId),
     { water: 0, meals: {} },
   );
   const water = typeof diet.water === 'number' ? diet.water : 0;
@@ -55,7 +55,7 @@ function computeLocalScores(date: string): Record<DimensionKey, number> {
 
   // Mind: práticas com notas ou sensação diferente da padrão
   const mind = readLocal<{ practiceLogs?: unknown }>(
-    `full-ritual-mind-${date}`,
+    scopedStorageKey(`full-ritual-mind-${date}`, userId),
     { practiceLogs: {} },
   );
   const engagedPractices = Object.values(objectValue(mind.practiceLogs)).filter(
@@ -67,23 +67,23 @@ function computeLocalScores(date: string): Record<DimensionKey, number> {
 
   return {
     skin: skinTotal > 0 ? Math.min(skinDone / skinTotal, 1) : 0,
-    body: computeLocalWorkoutScore(date) ?? 0,
+    body: computeLocalWorkoutScore(date, userId) ?? 0,
     mind: Math.min(engagedPractices / 3, 1),
     diet: waterScore * 0.5 + mealScore * 0.5,
     spirit: spiritScore,
   };
 }
 
-function computeLocalWorkoutScore(date: string): number | null {
+function computeLocalWorkoutScore(date: string, userId: string | null): number | null {
   const summary = readLocal<{ done: number; total: number } | null>(
-    `full-ritual-workout-summary-${date}`,
+    scopedStorageKey(`full-ritual-workout-summary-${date}`, userId),
     null,
   );
   if (summary && summary.total > 0) {
     return Math.max(0, Math.min(summary.done / summary.total, 1));
   }
 
-  const checks = readLocal<Record<string, boolean>>(`full-ritual-workout-blocks-${date}`, {});
+  const checks = readLocal<Record<string, boolean>>(scopedStorageKey(`full-ritual-workout-blocks-${date}`, userId), {});
   const keys = Object.keys(checks);
   if (keys.length === 0) return null;
   return Math.max(0, Math.min(keys.filter((key) => checks[key]).length / keys.length, 1));
@@ -135,8 +135,8 @@ export function Home() {
   const cycle = cycleInfo(profile?.cycle_start, profile?.cycle_length ?? 28, selectedDay);
   const weekDays = useMemo(() => weekDaysAround(selectedDate), [selectedDate]);
   const scores = useMemo<Record<DimensionKey, number>>(() => {
-    const localScores = computeLocalScores(selectedDate);
-    const localWorkoutScore = computeLocalWorkoutScore(selectedDate);
+    const localScores = computeLocalScores(selectedDate, userId);
+    const localWorkoutScore = computeLocalWorkoutScore(selectedDate, userId);
     if (!dailyScore) return localScores;
     return {
       skin: localScores.skin || dailyScore.score_skin / 100,
@@ -145,8 +145,8 @@ export function Home() {
       diet: localScores.diet || dailyScore.score_diet / 100,
       spirit: localScores.spirit || dailyScore.score_spirit / 100,
     };
-  }, [dailyScore, selectedDate]);
-  const energyFromCheckin = readLocal<{ energy?: number }>(`full-ritual-energy-${selectedDate}`, {}).energy;
+  }, [dailyScore, selectedDate, userId]);
+  const energyFromCheckin = readLocal<{ energy?: number }>(scopedStorageKey(`full-ritual-energy-${selectedDate}`, userId), {}).energy;
   const activeScoreAverage = activeDimensions.reduce((sum, key) => sum + scores[key], 0) / activeDimensions.length;
   const energyScoreNorm = typeof energyFromCheckin === 'number'
     ? Math.max(0, Math.min(1, energyFromCheckin / 10))
@@ -155,9 +155,9 @@ export function Home() {
   const totalScore = Math.round((totalInputs.reduce((sum, value) => sum + value, 0) / totalInputs.length) * 100);
 
   const sleepMin = useMemo(() => {
-    const logs = readLocal<Array<{ date: string; duration_min: number | null }>>('full-ritual-sleep', []);
+    const logs = readLocal<Array<{ date: string; duration_min: number | null }>>(scopedStorageKey('full-ritual-sleep', userId), []);
     return logs.find((l) => l.date === selectedDate)?.duration_min ?? null;
-  }, [selectedDate]);
+  }, [selectedDate, userId]);
 
   const sleepLabel = sleepMin !== null
     ? `${Math.floor(sleepMin / 60)}h${String(sleepMin % 60).padStart(2, '0')}`
@@ -259,9 +259,9 @@ export function Home() {
       while (count < 365) {
         const iso = isoToday(date);
         const hasActivity =
-          localStorage.getItem(`full-ritual-energy-${iso}`) !== null ||
-          localStorage.getItem(`full-ritual-spirit-${iso}`) !== null ||
-          localStorage.getItem(`full-ritual-diet-${iso}`) !== null;
+          localStorage.getItem(scopedStorageKey(`full-ritual-energy-${iso}`, userId)) !== null ||
+          localStorage.getItem(scopedStorageKey(`full-ritual-spirit-${iso}`, userId)) !== null ||
+          localStorage.getItem(scopedStorageKey(`full-ritual-diet-${iso}`, userId)) !== null;
         if (!hasActivity) break;
         count++;
         date = addDays(date, -1);
@@ -272,9 +272,9 @@ export function Home() {
 
     const since = lastDays(90)[0];
     void Promise.all([
-      supabase.from('insights').select('*').order('date', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('daily_scores').select('*').eq('date', selectedDate).maybeSingle(),
-      supabase.from('checkins').select('date').gte('date', since).order('date', { ascending: false }),
+      supabase.from('insights').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('daily_scores').select('*').eq('user_id', userId).eq('date', selectedDate).maybeSingle(),
+      supabase.from('checkins').select('date').eq('user_id', userId).gte('date', since).order('date', { ascending: false }),
     ]).then(([insightRes, scoreRes, checkinRes]) => {
       setLatestInsight((insightRes.data as Insight | null) ?? null);
       setDailyScore((scoreRes.data as DailyScore | null) ?? null);

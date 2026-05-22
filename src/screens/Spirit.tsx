@@ -2,6 +2,7 @@ import { relativeDateLabel } from '../lib/dates';
 import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
+import { scopedStorageKey } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import type { SpiritTheme } from '../types';
 
@@ -34,7 +35,7 @@ export function Spirit() {
   const userId = useApp((s) => s.userId);
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
-  const [spirit, setSpirit] = useLocalState<SpiritState>(`full-ritual-spirit-${selectedDate}`, initialSpirit);
+  const [spirit, setSpirit] = useLocalState<SpiritState>(scopedStorageKey(`full-ritual-spirit-${selectedDate}`, userId), initialSpirit);
   const dateLabel = relativeDateLabel(selectedDate);
 
   const update = <K extends keyof SpiritState>(key: K, value: SpiritState[K]) => {

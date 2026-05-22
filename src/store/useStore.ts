@@ -75,7 +75,18 @@ export const useApp = create<AppState>()(
       userId: null,
       profile: null,
       setProfile: (profile) => set({ profile }),
-      setUser: (userId) => set({ userId }),
+      setUser: (userId) => set((state) => {
+        if (state.userId === userId) return { userId };
+        return {
+          userId,
+          profile: null,
+          activeDimensions: ['skin', 'body', 'mind', 'diet', 'spirit'],
+          sexo: null,
+          screen: userId ? 'home' : 'home',
+          focusedDimension: undefined,
+          navigationStack: [],
+        };
+      }),
       activeDimensions: ['skin', 'body', 'mind', 'diet', 'spirit'],
       setActiveDimensions: (activeDimensions) => set({ activeDimensions }),
       sexo: null,
@@ -130,22 +141,46 @@ export const useApp = create<AppState>()(
       storage: createJSONStorage(() => safeStringStorage),
       version: 1,
       partialize: (state) => {
-        const { selectedDate: _selectedDate, ...persistedState } = state;
+        const {
+          selectedDate: _selectedDate,
+          userId: _userId,
+          profile: _profile,
+          activeDimensions: _activeDimensions,
+          sexo: _sexo,
+          ...persistedState
+        } = state;
         return persistedState;
       },
-      merge: (persistedState, currentState) => ({
-        ...currentState,
-        ...(persistedState as Partial<AppState>),
-        selectedDate: isoToday(),
-      }),
+      merge: (persistedState, currentState) => {
+        const {
+          userId: _userId,
+          profile: _profile,
+          activeDimensions: _activeDimensions,
+          sexo: _sexo,
+          ...safePersistedState
+        } = (persistedState as Partial<AppState>) ?? {};
+
+        return {
+          ...currentState,
+          ...safePersistedState,
+          selectedDate: isoToday(),
+        };
+      },
       migrate: (persistedState) => {
         const state = persistedState as AppState;
         const migratedState = (state?.screen as string) === 'sleep'
           ? { ...state, screen: 'energy' as Screen }
           : state;
+        const {
+          userId: _userId,
+          profile: _profile,
+          activeDimensions: _activeDimensions,
+          sexo: _sexo,
+          ...safeMigratedState
+        } = migratedState;
 
         return {
-          ...migratedState,
+          ...safeMigratedState,
           selectedDate: isoToday(),
         };
       },

@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon3D, type Icon3DKind } from '../components/Icon3D';
 import { useLocalState } from '../lib/useLocalState';
+import { scopedStorageKey } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
 import { isoToday } from '../lib/dates';
@@ -22,11 +23,13 @@ import type {
   LpoMovements,
   PedalType,
   PreferredTime,
+  RecoveryStatus,
   RunLocation,
   StrengthLocation,
   StrengthSplit,
   TrainingDay,
   TrainingGoal,
+  TrainingLevel,
   TrainingModality,
   TrainingPlan,
   TrainingProfile,
@@ -47,8 +50,8 @@ const DAY_ORDER: DayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const MODALITY_OPTIONS: { id: TrainingModality; label: string; icon: Icon3DKind; hint: string }[] = [
   { id: 'corrida', label: 'corrida', icon: 'running', hint: 'rua ou esteira' },
   { id: 'pedal', label: 'pedal', icon: 'cycling', hint: 'road, mtb, indoor' },
-  { id: 'musculacao', label: 'musculação', icon: 'lifting', hint: 'força e hipertrofia' },
-  { id: 'lpo', label: 'LPO', icon: 'olympic', hint: 'levantamento olímpico · sábado 9h' },
+  { id: 'musculacao', label: 'musculação', icon: 'lifting', hint: 'força, hipertrofia ou suporte esportivo' },
+  { id: 'lpo', label: 'LPO', icon: 'olympic', hint: 'levantamento olímpico' },
 ];
 
 const PREFERRED_TIME_OPTIONS: { id: PreferredTime; label: string }[] = [
@@ -59,11 +62,17 @@ const PREFERRED_TIME_OPTIONS: { id: PreferredTime; label: string }[] = [
 ];
 
 const GOAL_OPTIONS: { id: TrainingGoal; label: string; hint: string }[] = [
-  { id: 'fat_loss', label: 'perder gordura', hint: 'foco em déficit + cardio' },
-  { id: 'muscle_gain', label: 'ganhar massa', hint: 'volume + força progressiva' },
-  { id: 'performance', label: 'performance', hint: 'prova ou meta específica' },
-  { id: 'maintenance', label: 'manutenção', hint: 'saúde e consistência' },
+  { id: 'maintenance', label: 'saúde geral', hint: 'longevidade, consistência e condicionamento' },
+  { id: 'fat_loss', label: 'recomposição corporal', hint: 'perder gordura preservando massa magra' },
+  { id: 'muscle_gain', label: 'força / hipertrofia', hint: 'sobrecarga progressiva e recuperação' },
+  { id: 'performance', label: 'performance endurance', hint: 'corrida, pedal ou multimodalidade' },
   { id: 'event', label: 'evento específico', hint: 'prova / desafio marcado' },
+];
+
+const LEVEL_OPTIONS: { id: TrainingLevel; label: string; hint: string }[] = [
+  { id: 'beginner', label: 'iniciante', hint: 'aprendendo técnica e criando base' },
+  { id: 'intermediate', label: 'intermediário', hint: 'treina consistente e tolera intensidade moderada' },
+  { id: 'advanced', label: 'avançado', hint: 'tem métricas, autonomia técnica e histórico de carga' },
 ];
 
 const CONSISTENCY_OPTIONS: { id: ConsistencyBand; label: string }[] = [
@@ -71,6 +80,12 @@ const CONSISTENCY_OPTIONS: { id: ConsistencyBand; label: string }[] = [
   { id: '6m_1y', label: '6m a 1 ano' },
   { id: '1y_3y', label: '1 a 3 anos' },
   { id: 'over_3y', label: 'mais de 3 anos' },
+];
+
+const RECOVERY_OPTIONS: { id: RecoveryStatus; label: string; hint: string }[] = [
+  { id: 'good', label: 'boa', hint: 'sono e energia sustentam progressão' },
+  { id: 'ok', label: 'oscilante', hint: 'alguns dias bons, alguns limitados' },
+  { id: 'poor', label: 'baixa', hint: 'fadiga, sono ruim ou estresse alto' },
 ];
 
 const RUN_LOCATION_OPTIONS: { id: RunLocation; label: string }[] = [
@@ -114,6 +129,16 @@ function emptyDraft(userId: string): TrainingProfile {
     main_goal: 'maintenance',
     consistency_band: null,
     limitations: null,
+    training_level: null,
+    recent_training_summary: null,
+    weekly_training_hours: null,
+    priority_modality: null,
+    recovery_status: null,
+    target_event_name: null,
+    target_event_date: null,
+    target_event_modality: null,
+    strength_reference_loads: null,
+    technical_metrics: null,
     corrida_pace_min_per_km: null,
     corrida_max_distance_km: null,
     corrida_has_race: false,
@@ -127,7 +152,7 @@ function emptyDraft(userId: string): TrainingProfile {
     strength_location: null,
     strength_equipment: null,
     strength_split: null,
-    lpo_saturday_9am: true,
+    lpo_saturday_9am: false,
     lpo_has_coach: false,
     lpo_movements: null,
     created_at: new Date().toISOString(),
@@ -404,7 +429,7 @@ interface OnboardingProps {
 
 function Onboarding({ initial, initialAssignments, saving, onCancel, onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<TrainingProfile>(initial);
+  const [draft, setDraft] = useState<TrainingProfile>(() => ({ ...initial, lpo_saturday_9am: false }));
   const [dayAssignments, setDayAssignments] = useState<Partial<Record<DayOfWeek, (TrainingModality | 'rest')[]>>>(initialAssignments);
 
   const update = <K extends keyof TrainingProfile>(key: K, value: TrainingProfile[K]) => {
@@ -415,12 +440,7 @@ function Onboarding({ initial, initialAssignments, saving, onCancel, onComplete 
     setDraft((current) => {
       const has = current.modalities.includes(m);
       const next = has ? current.modalities.filter((x) => x !== m) : [...current.modalities, m];
-      // Se selecionar LPO e sábado 9h ativo, garante sábado disponível
-      let available = current.available_days;
-      if (!has && m === 'lpo' && current.lpo_saturday_9am && !available.includes('sat')) {
-        available = [...available, 'sat'];
-      }
-      return { ...current, modalities: next, available_days: available };
+      return { ...current, modalities: next, lpo_saturday_9am: false };
     });
   };
 
@@ -437,11 +457,12 @@ function Onboarding({ initial, initialAssignments, saving, onCancel, onComplete 
   const canAdvance = useMemo(() => {
     if (step === 0) return draft.modalities.length > 0;
     if (step === 1) return draft.available_days.length > 0 && draft.session_minutes > 0;
-    if (step === 2) return draft.consistency_band !== null;
+    if (step === 2) return draft.training_level !== null && draft.consistency_band !== null;
+    if (step === 3) return draft.recovery_status !== null;
     return true;
   }, [step, draft]);
 
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   return (
     <div className="screen stack-md body-screen">
@@ -491,6 +512,9 @@ function Onboarding({ initial, initialAssignments, saving, onCancel, onComplete 
         <StepGoal draft={draft} onUpdate={update} />
       )}
       {step === 3 && (
+        <StepCoachContext draft={draft} onUpdate={update} />
+      )}
+      {step === 4 && (
         <StepDetails draft={draft} onUpdate={update} />
       )}
 
@@ -533,8 +557,8 @@ function StepModalities({
   return (
     <section className="stack">
       <div className="stack">
-        <h2 className="onboarding-title">O que você treina hoje?</h2>
-        <p className="t-body muted">Selecione tudo que faz parte da sua rotina. Posso planejar uma ou mais modalidades.</p>
+        <h2 className="onboarding-title">Quais modalidades fazem parte da sua rotina?</h2>
+        <p className="t-body muted">Selecione as modalidades que devem entrar no planejamento. O plano será montado a partir dos seus dias, objetivo e nível atual.</p>
       </div>
       <div className="onboarding-cards">
         {MODALITY_OPTIONS.map((m) => {
@@ -577,7 +601,7 @@ function StepSchedule({
     <section className="stack">
       <div className="stack">
         <h2 className="onboarding-title">Quando você consegue treinar?</h2>
-        <p className="t-body muted">Marque os dias livres da semana, horário preferido e tempo médio por sessão.</p>
+        <p className="t-body muted">Marque os dias em que você consegue treinar, o horário mais provável e o tempo médio real por sessão.</p>
       </div>
 
       <div className="stack">
@@ -676,7 +700,7 @@ function StepGoal({
     <section className="stack">
       <div className="stack">
         <h2 className="onboarding-title">Seu objetivo e nível atual.</h2>
-        <p className="t-body muted">Isso define volume, intensidade e como vou progredir cargas.</p>
+        <p className="t-body muted">Isso define a ênfase do plano e o quanto posso usar intensidade, carga e autonomia técnica.</p>
       </div>
 
       <div className="stack">
@@ -700,6 +724,26 @@ function StepGoal({
       </div>
 
       <div className="stack">
+        <span className="eyebrow">nível técnico atual</span>
+        <div className="onboarding-cards">
+          {LEVEL_OPTIONS.map((level) => (
+            <button
+              key={level.id}
+              className={`modality-card${draft.training_level === level.id ? ' modality-card--active' : ''}`}
+              onClick={() => onUpdate('training_level', level.id)}
+            >
+              <span />
+              <div>
+                <strong>{level.label}</strong>
+                <small>{level.hint}</small>
+              </div>
+              <span className="modality-check">{draft.training_level === level.id ? '✓' : ''}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="stack">
         <span className="eyebrow">há quanto tempo treina consistente</span>
         <div className="choice-row">
           {CONSISTENCY_OPTIONS.map((c) => (
@@ -715,11 +759,11 @@ function StepGoal({
       </div>
 
       <div className="stack">
-        <span className="eyebrow">tem lesão ou limitação? (opcional)</span>
+        <span className="eyebrow">restrições, dores ou contexto importante (opcional)</span>
         <textarea
           className="field"
           rows={3}
-          placeholder="ex: tendinite no ombro esquerdo, evitar agachamento profundo..."
+          placeholder="ex: tendinite no ombro esquerdo, dor lombar, viagem frequente, sono ruim, restrição médica..."
           value={draft.limitations ?? ''}
           onChange={(e) => onUpdate('limitations', e.target.value || null)}
         />
@@ -728,7 +772,126 @@ function StepGoal({
   );
 }
 
-// ---------- STEP 4: detalhes por modalidade ----------
+// ---------- STEP 4: contexto para IA Coach ----------
+function StepCoachContext({
+  draft,
+  onUpdate,
+}: {
+  draft: TrainingProfile;
+  onUpdate: <K extends keyof TrainingProfile>(key: K, value: TrainingProfile[K]) => void;
+}) {
+  return (
+    <section className="stack">
+      <div className="stack">
+        <h2 className="onboarding-title">Contexto para o IA Coach.</h2>
+        <p className="t-body muted">Essas respostas calibram carga, progressão, recuperação e a lógica da semana.</p>
+      </div>
+
+      {draft.modalities.length > 1 && (
+        <div className="stack">
+          <span className="eyebrow">modalidade prioritária neste bloco</span>
+          <div className="choice-row">
+            {draft.modalities.map((m) => (
+              <button
+                key={m}
+                className={`chip${draft.priority_modality === m ? ' chip--active' : ''}`}
+                onClick={() => onUpdate('priority_modality', m)}
+              >
+                {MODALITY_LABEL[m]}
+              </button>
+            ))}
+            <button
+              className={`chip${draft.priority_modality === null ? ' chip--active' : ''}`}
+              onClick={() => onUpdate('priority_modality', null)}
+            >
+              equilibrado
+            </button>
+          </div>
+        </div>
+      )}
+
+      <label className="field-group">
+        <span>histórico recente de treino</span>
+        <textarea
+          className="field"
+          rows={3}
+          placeholder="ex: últimas 2 semanas: 3 corridas leves, 2 musculações, sem longão; parei por 1 mês; ou volume alto com fadiga..."
+          value={draft.recent_training_summary ?? ''}
+          onChange={(e) => onUpdate('recent_training_summary', e.target.value || null)}
+        />
+      </label>
+
+      <label className="field-group">
+        <span>volume semanal atual (horas)</span>
+        <input
+          className="field"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={0.5}
+          placeholder="ex: 4.5"
+          value={draft.weekly_training_hours ?? ''}
+          onChange={(e) => onUpdate('weekly_training_hours', e.target.value ? Number(e.target.value) : null)}
+        />
+      </label>
+
+      <div className="stack">
+        <span className="eyebrow">recuperação atual</span>
+        <div className="onboarding-cards">
+          {RECOVERY_OPTIONS.map((recovery) => (
+            <button
+              key={recovery.id}
+              className={`modality-card${draft.recovery_status === recovery.id ? ' modality-card--active' : ''}`}
+              onClick={() => onUpdate('recovery_status', recovery.id)}
+            >
+              <span />
+              <div>
+                <strong>{recovery.label}</strong>
+                <small>{recovery.hint}</small>
+              </div>
+              <span className="modality-check">{draft.recovery_status === recovery.id ? '✓' : ''}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="modality-section">
+        <span className="eyebrow">prova ou evento-alvo (opcional)</span>
+        <label className="field-group">
+          <span>nome do evento</span>
+          <input
+            className="field"
+            type="text"
+            placeholder="ex: meia maratona, granfondo, triathlon sprint"
+            value={draft.target_event_name ?? ''}
+            onChange={(e) => onUpdate('target_event_name', e.target.value || null)}
+          />
+        </label>
+        <label className="field-group">
+          <span>data</span>
+          <input
+            className="field"
+            type="date"
+            value={draft.target_event_date ?? ''}
+            onChange={(e) => onUpdate('target_event_date', e.target.value || null)}
+          />
+        </label>
+        <label className="field-group">
+          <span>modalidade / distância</span>
+          <input
+            className="field"
+            type="text"
+            placeholder="ex: 10 km, 70.3, MTB 80 km"
+            value={draft.target_event_modality ?? ''}
+            onChange={(e) => onUpdate('target_event_modality', e.target.value || null)}
+          />
+        </label>
+      </div>
+    </section>
+  );
+}
+
+// ---------- STEP 5: detalhes por modalidade ----------
 function StepDetails({
   draft,
   onUpdate,
@@ -742,8 +905,19 @@ function StepDetails({
     <section className="stack">
       <div className="stack">
         <h2 className="onboarding-title">Últimos detalhes por modalidade.</h2>
-        <p className="t-body muted">Quanto mais específico, mais eu acerto no primeiro plano.</p>
+        <p className="t-body muted">Preencha o que souber. Dados atuais ajudam a calibrar intensidade, volume e progressão sem copiar rotina de outra pessoa.</p>
       </div>
+
+      <label className="field-group">
+        <span>métricas técnicas que você já usa (opcional)</span>
+        <textarea
+          className="field"
+          rows={2}
+          placeholder="ex: FC repouso 52, FC máx 188, zonas por Garmin, pace Z2 6:20, potência crítica..."
+          value={draft.technical_metrics ?? ''}
+          onChange={(e) => onUpdate('technical_metrics', e.target.value || null)}
+        />
+      </label>
 
       {has('corrida') && (
         <div className="modality-section">
@@ -914,23 +1088,22 @@ function StepDetails({
               onChange={(e) => onUpdate('strength_equipment', e.target.value || null)}
             />
           </label>
+          <label className="field-group">
+            <span>cargas de referência (opcional)</span>
+            <textarea
+              className="field"
+              rows={2}
+              placeholder="ex: agachamento 60kg x5, terra 80kg x3, supino 40kg x8, RPE médio 7"
+              value={draft.strength_reference_loads ?? ''}
+              onChange={(e) => onUpdate('strength_reference_loads', e.target.value || null)}
+            />
+          </label>
         </div>
       )}
 
       {has('lpo') && (
         <div className="modality-section">
           <span className="eyebrow">LPO</span>
-          <label className="field-toggle">
-            <span>
-              <strong>sábado 9h</strong>
-              <small>horário fixo do LPO. desmarque se for variável.</small>
-            </span>
-            <input
-              type="checkbox"
-              checked={draft.lpo_saturday_9am}
-              onChange={(e) => onUpdate('lpo_saturday_9am', e.target.checked)}
-            />
-          </label>
           <label className="field-toggle">
             <span>
               <strong>treina com coach</strong>
@@ -1004,11 +1177,11 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
   const [fitUploading, setFitUploading] = useState(false);
   const [fitModality, setFitModality] = useState<TrainingModality>('pedal');
   const [fitAnalysis, setFitAnalysis] = useLocalState<FitAnalysis | null>(
-    `full-ritual-fit-analysis-${activeWorkoutDate}`,
+    scopedStorageKey(`full-ritual-fit-analysis-${activeWorkoutDate}`, userId),
     null,
   );
   const [blockChecks, setBlockChecks] = useLocalState<Record<string, boolean>>(
-    `full-ritual-workout-blocks-${activeWorkoutDate}`,
+    scopedStorageKey(`full-ritual-workout-blocks-${activeWorkoutDate}`, userId),
     {},
   );
 
@@ -1020,7 +1193,7 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
       const next = { ...prev, [key]: !prev[key] };
       if (day) {
         const done = groups.filter((group) => next[`${dayIdx}:${group.key}`]).length;
-        writeWorkoutSummary(day.date, done, groups.length);
+        writeWorkoutSummary(day.date, done, groups.length, userId);
       }
       return next;
     });
@@ -1060,8 +1233,8 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
     const day = days.find((item) => item.date === activeWorkoutDate);
     if (!day) return;
     const { done, total } = dayProgress(day);
-    writeWorkoutSummary(day.date, done, total);
-  }, [activeWorkoutDate, blockChecks, days]);
+    writeWorkoutSummary(day.date, done, total, userId);
+  }, [activeWorkoutDate, blockChecks, days, userId]);
 
   const handleFitUpload = async (file: File | null) => {
     if (!file) return;
@@ -1502,10 +1675,10 @@ function TrainingSessionCard({
   );
 }
 
-function writeWorkoutSummary(date: string, done: number, total: number) {
+function writeWorkoutSummary(date: string, done: number, total: number, userId: string | null) {
   try {
     localStorage.setItem(
-      `full-ritual-workout-summary-${date}`,
+      scopedStorageKey(`full-ritual-workout-summary-${date}`, userId),
       JSON.stringify({
         done,
         total,

@@ -116,7 +116,8 @@ export interface WaterLog {
   logged_at: string;
 }
 
-export type MealType = 'manha' | 'almoco' | 'lanche' | 'jantar' | 'ceia';
+export type MealType = 'manha' | 'almoco' | 'lanche' | 'jantar' | 'ceia' | 'pre_treino' | 'pos_treino' | 'intra_treino';
+export type WorkoutMealPeriod = 'manha' | 'tarde' | 'noite';
 export interface MealLog {
   id: string;
   user_id: string;
@@ -234,6 +235,8 @@ export type PedalType = 'roadbike' | 'mtb' | 'indoor';
 export type StrengthLocation = 'gym' | 'home' | 'outdoor';
 export type StrengthSplit = 'fullbody' | 'upper_lower' | 'ppl' | 'bro_split' | 'other';
 export type LpoMovements = 'basics' | 'full_oly';
+export type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
+export type RecoveryStatus = 'good' | 'ok' | 'poor';
 export type PlanSource = 'onboarding' | 'feedback' | 'manual';
 export type IntensityLevel = 'easy' | 'moderate' | 'hard' | 'max';
 
@@ -246,6 +249,16 @@ export interface TrainingProfile {
   main_goal: TrainingGoal;
   consistency_band: ConsistencyBand | null;
   limitations: string | null;
+  training_level: TrainingLevel | null;
+  recent_training_summary: string | null;
+  weekly_training_hours: number | null;
+  priority_modality: TrainingModality | null;
+  recovery_status: RecoveryStatus | null;
+  target_event_name: string | null;
+  target_event_date: string | null;
+  target_event_modality: string | null;
+  strength_reference_loads: string | null;
+  technical_metrics: string | null;
 
   corrida_pace_min_per_km: string | null;
   corrida_max_distance_km: number | null;

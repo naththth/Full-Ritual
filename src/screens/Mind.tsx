@@ -6,6 +6,7 @@ import { relativeDateLabel } from '../lib/dates';
 import { bookCoverSrc, mergeReadingBooks, readingProgress } from '../lib/reading';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
+import { scopedStorageKey } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import type { ContentPref, MindLog, ReadingBook, ReadingSession } from '../types';
 
@@ -147,9 +148,9 @@ export function Mind() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
   const goTo = useApp((s) => s.goTo);
-  const [mind, setMind] = useLocalState<MindState>(`full-ritual-mind-${selectedDate}`, initialMind);
-  const [readingBooks, setReadingBooks] = useLocalState<ReadingBook[]>('full-ritual-reading-books', []);
-  const [, setReadingSessions] = useLocalState<ReadingSession[]>('full-ritual-reading-sessions', []);
+  const [mind, setMind] = useLocalState<MindState>(scopedStorageKey(`full-ritual-mind-${selectedDate}`, userId), initialMind);
+  const [readingBooks, setReadingBooks] = useLocalState<ReadingBook[]>(scopedStorageKey('full-ritual-reading-books', userId), []);
+  const [, setReadingSessions] = useLocalState<ReadingSession[]>(scopedStorageKey('full-ritual-reading-sessions', userId), []);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const dateLabel = relativeDateLabel(selectedDate);
@@ -173,6 +174,7 @@ export function Mind() {
     void supabase
       .from('reading_books')
       .select('*')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) {

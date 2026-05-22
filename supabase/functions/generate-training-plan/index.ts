@@ -171,13 +171,15 @@ Regras duras:
 - Nunca misture pedal e musculação dentro do mesmo bloco.
 - Cada modalidade deve ter no máximo 3 blocos principais: aquecimento, série/treino, desaquecimento.
 - O conteúdo de cada bloco deve ser claro para consulta durante o treino, com linhas separadas por \\n.
-- Musculação: priorize força absoluta e desenvolvimento neuromuscular. Cada linha da série deve começar pelo nome do exercício, depois prescrição. Exemplo: "Agachamento livre — 5×3 · RPE 8 · desc 3min". Não quebre RPE/descanso em linhas separadas.
-- Pedal: sempre assuma speed no rolo/smart trainer. Use potência, cadência e RPE; explique a execução como treinador para atleta, com linguagem técnica porém acessível.
-- Pedal no rolo: não use velocidade como métrica principal. Priorize watts, zonas, cadência, estabilidade de quadril, tronco quieto e recuperação entre blocos.
-- Pedal no rolo: se precisar explicar contexto, coloque em linha separada como "Leitura do rolo — ...". Não coloque frases longas dentro de chips/prescrições.
+- Musculação: calibre por nível. Iniciante usa técnica, adaptação anatômica e 8-15 reps; intermediário usa progressão simples; avançado pode usar força máxima/específica quando coerente. Cada linha da série deve começar pelo nome do exercício, depois prescrição. Exemplo: "Agachamento livre — 4×8 · RPE 7 · desc 2min". Não quebre RPE/descanso em linhas separadas.
+- Pedal: use o contexto informado. Se houver FTP/potência, prescreva watts/zonas; se não houver, use RPE, cadência e percepção. Só assuma rolo/smart trainer quando o perfil indicar indoor.
+- Pedal indoor: não use velocidade como métrica principal. Priorize watts quando houver, zonas, cadência, estabilidade de quadril, tronco quieto e recuperação entre blocos.
+- Pedal indoor: se precisar explicar contexto, coloque em linha separada como "Leitura do rolo — ...". Não coloque frases longas dentro de chips/prescrições.
+- LPO: nunca assuma sábado 9h ou qualquer horário fixo. Use somente os dias/modalidades informados em day_assignments e no perfil.
 - Se houver limitação, reduza intensidade e explique no notes.
 - Use FTP do pedal quando existir. Use pace da corrida quando existir.
 - Não invente lesões, exames, diagnósticos ou métricas que não foram fornecidas.
+- Se houver target_event_date, organize a semana dentro da fase apropriada em relação à prova.
 - Se faltarem dados para uma prescrição fina, gere um plano conservador e registre em notes quais dados refinariam a próxima geração.`;
 }
 

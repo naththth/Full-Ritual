@@ -4,6 +4,7 @@ import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
+import { scopedStorageKey } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import { hasSupabase, supabase } from '../lib/supabase';
 
@@ -16,8 +17,8 @@ export function Ritual() {
 
   const [period, setPeriod] = useState<RoutinePeriod>('day');
   const [openAreas, setOpenAreas] = useState<Set<RoutineArea>>(new Set());
-  const [checks, setChecks] = useLocalState<RoutineChecks>(`full-ritual-routine-checks-${selectedDate}`, {});
-  const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(`full-ritual-skin-photo-${selectedDate}`, null);
+  const [checks, setChecks] = useLocalState<RoutineChecks>(scopedStorageKey(`full-ritual-routine-checks-${selectedDate}`, userId), {});
+  const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(scopedStorageKey(`full-ritual-skin-photo-${selectedDate}`, userId), null);
   const [note, setNote] = useState('');
 
   const routine: Record<RoutineArea, ReturnType<typeof getRoutineTasks>> = {

@@ -47,7 +47,7 @@ interface SlotPlan {
 
 /**
  * Distribui modalidades pelos dias disponíveis seguindo regras simples:
- * - LPO trava no sábado se selecionado e sábado disponível;
+ * - LPO usa os dias informados no onboarding, sem assumir horário fixo;
  * - Musculação separa do cardio quando possível;
  * - Corrida e pedal alternam para não sobrecarregar pernas;
  * - Dias não selecionados viram descanso.
@@ -65,33 +65,26 @@ export function distributeModalities(profile: TrainingProfile): Record<DayOfWeek
 
   const available = new Set<DayOfWeek>(profile.available_days);
   const modalities = [...profile.modalities];
-  const hasLpo = modalities.includes('lpo');
 
-  // 1) LPO fixo no sábado, se aplicável
-  if (hasLpo && profile.lpo_saturday_9am && available.has('sat')) {
-    slots.sat = { modality: 'lpo', intensity: 'hard' };
-  }
-
-  // 2) Ordena os outros dias
   const remainingDays = DAY_ORDER.filter((d) => available.has(d) && slots[d].modality === 'rest');
-  const cardioModalities = modalities.filter((m) => m === 'corrida' || m === 'pedal');
+  const nonStrengthModalities = modalities.filter((m) => m === 'corrida' || m === 'pedal' || m === 'lpo');
   const strengthSelected = modalities.includes('musculacao');
 
-  // Round-robin priorizando alternância cardio/força
-  let cardioIdx = 0;
+  // Round-robin priorizando alternância entre força e demais modalidades.
+  let nonStrengthIdx = 0;
   let useStrength = !strengthSelected ? false : true;
 
   remainingDays.forEach((day, i) => {
     const wantStrength = strengthSelected && useStrength && i % 2 === 0;
     if (wantStrength) {
       slots[day] = { modality: 'musculacao', intensity: 'moderate' };
-    } else if (cardioModalities.length > 0) {
-      const mod = cardioModalities[cardioIdx % cardioModalities.length];
-      cardioIdx += 1;
+    } else if (nonStrengthModalities.length > 0) {
+      const mod = nonStrengthModalities[nonStrengthIdx % nonStrengthModalities.length];
+      nonStrengthIdx += 1;
       const isLongDay = day === 'sun' || day === 'sat';
       slots[day] = {
         modality: mod,
-        intensity: isLongDay ? 'hard' : 'moderate',
+        intensity: mod === 'lpo' || isLongDay ? 'hard' : 'moderate',
       };
     } else if (strengthSelected) {
       slots[day] = { modality: 'musculacao', intensity: 'moderate' };
@@ -161,6 +154,7 @@ function buildMusculacao(intensity: IntensityLevel, profile: TrainingProfile): S
   const split = profile.strength_split ?? 'fullbody';
   const location = profile.strength_location ?? 'gym';
   const locNote = location === 'home' ? ' (casa: halteres/elásticos)' : location === 'outdoor' ? ' (ar livre: peso corporal)' : '';
+  const level = profile.training_level ?? 'beginner';
 
   const h = intensity === 'hard';
 
@@ -181,14 +175,26 @@ function buildMusculacao(intensity: IntensityLevel, profile: TrainingProfile): S
     ],
   });
 
+  if (level === 'beginner') return musSession(
+    'força base · técnica',
+    'Mobilidade tornozelo/quadril/torácica 6 min · ponte de glúteo 2×12 · remada elástico 2×15 · agachamento sem carga 2×8',
+    `Agachamento goblet ou caixa — 3×10 · RPE 6 · desc 90s
+Supino haltere ou flexão inclinada — 3×10 · RPE 6 · desc 90s
+Remada baixa ou remada haltere — 3×12 · RPE 6–7 · desc 90s
+Levantamento terra romeno haltere — 3×10 · RPE 6 · desc 90s
+Step-up baixo ou afundo assistido — 2×10/perna · controle total
+Dead bug — 3×8/lado · Prancha lateral — 2×20s/lado`,
+    'Respiração diafragmática 2 min · mobilidade leve de quadril e peitoral',
+  );
+
   if (split === 'fullbody') return musSession(
-    h ? 'full body pesado' : 'full body',
+    h && level === 'advanced' ? 'full body pesado' : 'full body',
     'Rotação quadril 10×/lado · mobilidade escapular · ponte 2×15 · agachamento de parede ×10',
-    `Agachamento livre — ${h ? '5×5 · RPE 8–9 · desc 3min' : '4×8 · RPE 7 · desc 2min'}
-Supino inclinado haltere — ${h ? '4×6 · RPE 7' : '4×10 · RPE 7'} · desc 90s
-Remada curvada supinada — 4×${h ? '6' : '10'} · RPE 8 · desc 90s
-Desenvolvimento haltere — 3×${h ? '8' : '12'} · desc 60s
-Romanian Deadlift — 3×${h ? '6' : '10'} · RPE 7 · desc 90s
+    `Agachamento livre — ${h && level === 'advanced' ? '5×5 · RPE 8–9 · desc 3min' : '4×8 · RPE 7 · desc 2min'}
+Supino inclinado haltere — ${h && level === 'advanced' ? '4×6 · RPE 7' : '4×10 · RPE 7'} · desc 90s
+Remada curvada supinada — 4×${h && level === 'advanced' ? '6' : '10'} · RPE 8 · desc 90s
+Desenvolvimento haltere — 3×${h && level === 'advanced' ? '8' : '12'} · desc 60s
+Romanian Deadlift — 3×${h && level === 'advanced' ? '6' : '10'} · RPE 7 · desc 90s
 Dead bug — 3×8/lado · Prancha lateral — 2×30s`,
     'Quadríceps 90s/lado · peitoral doorway 60s · isquio 60s/lado',
   );
@@ -250,9 +256,9 @@ Finalizador: 100 elevações laterais — 4×25 · desc 30s`,
   return musSession(
     'musculação',
     'Mobilidade articular do grupo do dia · ativação com carga leve',
-    `2–3 compostos: 4×5–8 · RPE 7–9 · desc 2–3min
+    `2–3 compostos: 4×6–10 · RPE 7–8 · desc 2–3min
 2–3 isolados: 3×12–15 · desc 60–90s
-Última série deve ser desafiadora — sem energia sobrada = carga baixa`,
+Última série desafiadora, mantendo técnica limpa e 1–3 repetições em reserva`,
     'Alongamento estático do grupo trabalhado',
   );
 }

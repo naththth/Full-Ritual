@@ -24,9 +24,9 @@ export function Evolution() {
     const since = lastDays(30)[0];
 
     void Promise.all([
-      supabase.from('daily_scores').select('*').gte('date', since).order('date', { ascending: true }),
-      supabase.from('sleep_logs').select('*').gte('date', since).order('date', { ascending: true }),
-      supabase.from('checkins').select('*').gte('date', since).order('date', { ascending: true }),
+      supabase.from('daily_scores').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
+      supabase.from('sleep_logs').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
+      supabase.from('checkins').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
     ]).then(([scoreRes, sleepRes, checkinRes]) => {
       setScores((scoreRes.data ?? []) as DailyScore[]);
       setSleepLogs((sleepRes.data ?? []) as SleepLog[]);

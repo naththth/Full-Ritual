@@ -89,7 +89,9 @@ const TIPS: Record<CyclePhase, Record<Context, string[]>> = {
 
 export function CyclePhaseBanner({ context, date }: { context: Context; date: string }) {
   const profile = useApp((s) => s.profile);
+  const sexo = useApp((s) => s.sexo);
 
+  if (sexo === 'masculino') return null;
   if (!profile?.cycle_tracking || !profile.cycle_start) return null;
 
   const info = cycleInfo(profile.cycle_start, profile.cycle_length ?? 28, dateFromIso(date));

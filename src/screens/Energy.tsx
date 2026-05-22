@@ -3,6 +3,7 @@ import { PresenceSlider } from '../components/PresenceSlider';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, diffMinutes, formatDateLong, isoToday, lastDays, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
+import { scopedStorageKey } from '../lib/storage';
 import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
 import { useApp } from '../store/useStore';
@@ -86,9 +87,9 @@ export function Energy() {
   const sexo = useApp((s) => s.sexo);
 
   const previousDate = isoToday(addDays(dateFromIso(selectedDate), -1));
-  const [rawCheckin, setCheckin] = useLocalState<EnergyCheckin>(`full-ritual-energy-${selectedDate}`, initialCheckin());
-  const [rawSleepLogs, setSleepLogs] = useLocalState<SleepLog[]>('full-ritual-sleep', []);
-  const [rawCyclePrefs, setCyclePrefs] = useLocalState<CyclePrefs>('full-ritual-cycle', {
+  const [rawCheckin, setCheckin] = useLocalState<EnergyCheckin>(scopedStorageKey(`full-ritual-energy-${selectedDate}`, userId), initialCheckin());
+  const [rawSleepLogs, setSleepLogs] = useLocalState<SleepLog[]>(scopedStorageKey('full-ritual-sleep', userId), []);
+  const [rawCyclePrefs, setCyclePrefs] = useLocalState<CyclePrefs>(scopedStorageKey('full-ritual-cycle', userId), {
     start: profile?.cycle_start ?? selectedDate,
     length: profile?.cycle_length ?? 28,
     tracking: profile?.cycle_tracking ?? false,

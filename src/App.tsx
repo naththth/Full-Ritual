@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Home } from './screens/Home';
 import { Energy } from './screens/Energy';
 import { Ritual } from './screens/Ritual';
@@ -31,11 +31,14 @@ export default function App() {
   const focusedDimension = useApp((s) => s.focusedDimension);
   const selectedDate = useApp((s) => s.selectedDate);
   const userId = useApp((s) => s.userId);
+  const activeDimensions = useApp((s) => s.activeDimensions);
   const setUser = useApp((s) => s.setUser);
+  const goTo = useApp((s) => s.goTo);
   const setSelectedDate = useApp((s) => s.setSelectedDate);
   const toast = useApp((s) => s.toast);
   const autoSelectedDate = useRef(isoToday());
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [authReady, setAuthReady] = useState(!hasSupabase);
 
   const setProfile = useApp((s) => s.setProfile);
   const profile = useApp((s) => s.profile);
@@ -43,7 +46,8 @@ export default function App() {
   useEffect(() => {
     if (!hasSupabase) return;
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setUser(data.session.user.id);
+      setUser(data.session?.user.id ?? null);
+      setAuthReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
@@ -107,6 +111,15 @@ export default function App() {
     scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [screen, focusedDimension, selectedDate]);
 
+  useEffect(() => {
+    if (screen === 'products' && !activeDimensions.includes('skin')) goTo('home');
+    if (screen === 'library' && !activeDimensions.includes('mind')) goTo('home');
+  }, [activeDimensions, goTo, screen]);
+
+  if (!authReady) return (
+    <div className="app-shell"><main className="app" /></div>
+  );
+
   if (!userId) return (
     <div className="app-shell"><main className="app"><Login /></main></div>
   );
@@ -132,8 +145,8 @@ export default function App() {
           {screen === 'spirit' && <Spirit />}
           {screen === 'insight' && <Insight />}
           {screen === 'profile' && <Profile />}
-          {screen === 'products' && <Products />}
-          {screen === 'library' && <Library />}
+          {screen === 'products' && activeDimensions.includes('skin') && <Products />}
+          {screen === 'library' && activeDimensions.includes('mind') && <Library />}
           {screen === 'evolution' && <Evolution />}
           {screen === 'chat' && <Chat />}
           {screen === 'body_coach' && <BodyCoach />}

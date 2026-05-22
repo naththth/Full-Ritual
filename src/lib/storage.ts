@@ -19,6 +19,10 @@ export function writeJson(key: string, value: unknown) {
   }
 }
 
+export function scopedStorageKey(key: string, userId: string | null | undefined) {
+  return `${key}::${userId ?? 'local'}`;
+}
+
 export const safeStringStorage = {
   getItem: (key: string) => {
     try {

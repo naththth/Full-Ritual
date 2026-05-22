@@ -3,6 +3,7 @@ import { BackButton } from '../components/BackButton';
 import { geminiChat } from '../lib/gemini';
 import { isoToday } from '../lib/dates';
 import { useLocalState } from '../lib/useLocalState';
+import { scopedStorageKey } from '../lib/storage';
 import { useApp } from '../store/useStore';
 
 interface ChatMessage {
@@ -23,7 +24,8 @@ const starterMessages: ChatMessage[] = [
 
 export function Chat() {
   const focusedDimension = useApp((s) => s.focusedDimension);
-  const [messages, setMessages] = useLocalState<ChatMessage[]>('full-ritual-chat', starterMessages);
+  const userId = useApp((s) => s.userId);
+  const [messages, setMessages] = useLocalState<ChatMessage[]>(scopedStorageKey('full-ritual-chat', userId), starterMessages);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
 

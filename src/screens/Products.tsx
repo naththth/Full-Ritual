@@ -3,13 +3,10 @@ import {
   PRODUCT_CATEGORIES,
   PRODUCT_FREQUENCIES,
   PRODUCT_STEPS,
-  ROUTINES,
-  getRoutineTasks,
   type RoutineArea,
-  type RoutinePeriod,
-  type RoutineTask,
 } from '../data/ritualContent';
 import { regenerateSkincareRoutine } from '../lib/gemini';
+import { scopedStorageKey } from '../lib/storage';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
@@ -17,10 +14,8 @@ import { useApp } from '../store/useStore';
 import type { Product, ProductCategory, ProductFrequency, ProductStep } from '../types';
 
 type ProductDraft = Pick<Product, 'name' | 'brand' | 'category' | 'step' | 'frequency' | 'notes' | 'photo_url'>;
-type SavedProductListItem = Product & { source: 'saved' };
-type RoutineProductListItem = Pick<Product, 'id' | 'name' | 'brand' | 'category' | 'step' | 'frequency' | 'notes' | 'photo_url'> & { source: 'routine' };
 type ProductRoutineArea = RoutineArea;
-type ProductListItem = (SavedProductListItem | RoutineProductListItem) & { routineArea: ProductRoutineArea };
+type ProductListItem = Product & { routineArea: ProductRoutineArea };
 type ProductMeta = { routineArea: ProductRoutineArea };
 
 const emptyDraft: ProductDraft = {
@@ -37,7 +32,7 @@ export function Products() {
   const userId = useApp((s) => s.userId);
   const selectedDate = useApp((s) => s.selectedDate);
   const showToast = useApp((s) => s.showToast);
-  const [localProducts, setLocalProducts] = useLocalState<Product[]>('full-ritual-products', []);
+  const [localProducts, setLocalProducts] = useLocalState<Product[]>(scopedStorageKey('full-ritual-products', userId), []);
   const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
   const [draftMeta, setDraftMeta] = useState<ProductMeta>({ routineArea: 'face' });
@@ -51,19 +46,13 @@ export function Products() {
     () => [...source].filter((product) => product.active).sort((a, b) => a.order_in_routine - b.order_in_routine),
     [source]
   );
-  const routineProducts = useMemo(() => buildRoutineProducts(selectedDate), [selectedDate]);
+  const routineHintDate = selectedDate;
   const activeProducts = useMemo(() => {
-    const savedItems: ProductListItem[] = ordered.map((product) => ({
+    return ordered.map((product) => ({
       ...product,
-      source: 'saved',
       routineArea: inferRoutineArea(product),
     }));
-    const savedKeys = new Set(savedItems.map((product) => normalizeProductKey(product.name)));
-    return [
-      ...savedItems,
-      ...routineProducts.filter((product) => !savedKeys.has(normalizeProductKey(product.name))),
-    ];
-  }, [ordered, routineProducts]);
+  }, [ordered]);
 
   useEffect(() => {
     if (!hasSupabase || !userId) {
@@ -124,7 +113,7 @@ export function Products() {
         };
 
         const query = editingId
-          ? supabase.from('products').update(payload).eq('id', editingId).select('*').single()
+          ? supabase.from('products').update(payload).eq('id', editingId).eq('user_id', userId).select('*').single()
           : supabase.from('products').insert(payload).select('*').single();
         const { data, error } = await query;
         if (error) throw error;
@@ -164,7 +153,7 @@ export function Products() {
   const editProduct = (product: Product) => {
     const routineArea = inferRoutineArea(product);
     setEditingId(product.id);
-    setEditingSource({ ...product, source: 'saved', routineArea });
+    setEditingSource({ ...product, routineArea });
     setDraft({
       name: product.name,
       brand: product.brand ?? '',
@@ -178,28 +167,12 @@ export function Products() {
   };
 
   const editListItem = (product: ProductListItem) => {
-    if (product.source === 'saved') {
-      editProduct(product);
-      return;
-    }
-
-    setEditingId(null);
-    setEditingSource(product);
-    setDraft({
-      name: product.name,
-      brand: product.brand ?? '',
-      category: product.category,
-      step: product.step,
-      frequency: product.frequency,
-      notes: stripProductMeta(product.notes),
-      photo_url: product.photo_url ?? getDefaultProductPhotoUrl(product.name),
-    });
-    setDraftMeta({ routineArea: product.routineArea });
+    editProduct(product);
   };
 
   const removeProduct = async (product: Product) => {
-    if (hasSupabase) {
-      const { error } = await supabase.from('products').update({ active: false }).eq('id', product.id);
+    if (hasSupabase && userId) {
+      const { error } = await supabase.from('products').update({ active: false }).eq('id', product.id).eq('user_id', userId);
       if (error) {
         showToast('não foi possível remover.');
         return;
@@ -305,7 +278,7 @@ export function Products() {
         </div>
         {routineNotes.length > 0 && (
           <div className="stack">
-            {routineNotes.map((note) => <p key={note} className="t-body-sm muted">{note}</p>)}
+            {routineNotes.map((note) => <p key={`${routineHintDate}-${note}`} className="t-body-sm muted">{note}</p>)}
           </div>
         )}
       </section>
@@ -331,8 +304,7 @@ export function Products() {
             </div>
             <div className="row">
               <button className="chip" onClick={() => editListItem(product)}>editar</button>
-              {product.source === 'saved' && <button className="chip" onClick={() => void removeProduct(product)}>remover</button>}
-              {product.source === 'routine' && <span className="product-source">na rotina de pele</span>}
+              <button className="chip" onClick={() => void removeProduct(product)}>remover</button>
             </div>
           </article>
         ))}
@@ -416,98 +388,6 @@ function renderProductForm({
       </div>
     </section>
   );
-}
-
-function buildRoutineProducts(dateIso: string): ProductListItem[] {
-  const entries: Array<{ period: RoutinePeriod; area: RoutineArea; task: RoutineTask; index: number }> = [];
-
-  (['day', 'night'] as RoutinePeriod[]).forEach((period) => {
-    (['face', 'body', 'aromas'] as RoutineArea[]).forEach((area) => {
-      const tasks = area === 'face' ? getRoutineTasks(period, area, dateIso) : ROUTINES[period][area];
-      tasks.forEach((task, index) => entries.push({ period, area, task, index }));
-    });
-  });
-
-  const products = entries
-    .map(({ period, area, task, index }) => routineTaskToProduct(task, area, period, index))
-    .filter((product): product is ProductListItem => Boolean(product));
-  const seen = new Set<string>();
-
-  return products.filter((product) => {
-    const key = normalizeProductKey(product.name);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function routineTaskToProduct(
-  task: RoutineTask,
-  area: RoutineArea,
-  period: RoutinePeriod,
-  index: number
-): ProductListItem | null {
-  const product = parseRoutineProduct(task.title);
-  if (!product) return null;
-
-  return {
-    id: `routine-${period}-${area}-${index}-${normalizeProductKey(product.name)}`,
-    name: product.name,
-    brand: product.brand,
-    category: routineAreaToCategory(area, task.tag),
-    step: period === 'day' ? 'manha' : 'noite',
-    frequency: task.description.toLowerCase().includes('duas a três') || task.description.toLowerCase().includes('segunda') ? 'semanal' : 'diaria',
-    notes: task.tag,
-    photo_url: getDefaultProductPhotoUrl(product.name),
-    source: 'routine',
-    routineArea: area,
-  };
-}
-
-function parseRoutineProduct(title: string): Pick<ProductListItem, 'name' | 'brand'> | null {
-  const clean = title.trim();
-  const lower = clean.toLowerCase();
-
-  if (lower.includes('playlist') || lower.includes('abrir janela') || lower.includes('frase de fechamento')) return null;
-
-  if (
-    lower.includes('manhã de barreira') ||
-    lower.includes('noite de reparação') ||
-    lower.includes('ativo da noite quando indicado') ||
-    lower.includes('hidratação corporal de tratamento') ||
-    lower.includes('frase de fechamento')
-  ) return null;
-
-  const known: Array<[string, string, string | null]> = [
-    ['Bioderma Sensibio AR+ Cream', 'Sensibio AR+ Cream', 'Bioderma'],
-    ['Bioderma Sensibio', 'Sensibio', 'Bioderma'],
-    ['SkinCeuticals P-Tiox', 'P-Tiox', 'SkinCeuticals'],
-    ['protetor solar Adcos', 'Protetor solar', 'Adcos'],
-    ['sabonete líquido Verbena', 'Sabonete líquido Verbena', null],
-    ['Ureadin', 'Ureadin', null],
-    ['Pink Cheeks', 'Pink Cheeks', 'Pink Cheeks'],
-    ['Água Refrescante Energia', 'Água Refrescante Energia', null],
-    ['Difusor Alecrim & Capim Limão', 'Difusor Alecrim & Capim Limão', null],
-    ['vela de Olíbano', 'Vela de Olíbano', null],
-    ['Ylang Ylang ou Lavanda', 'Ylang Ylang ou Lavanda', null],
-    ['Amande', 'Amande', null],
-    ['Provence', 'Provence', null],
-    ['Ácido salicílico', 'Ácido salicílico', null],
-    ['Retrinal', 'Retrinal', null],
-  ];
-
-  const found = known.find(([needle]) => lower.includes(needle.toLowerCase()));
-  if (found) return { name: found[1], brand: found[2] };
-
-  return { name: clean.replace(/^(Lavar com|Aplicar|Finalizar com|Banho com|Acender|Vela de)\s+/i, ''), brand: null };
-}
-
-function routineAreaToCategory(area: RoutineArea, tag: string): ProductCategory {
-  if (area === 'body' || area === 'aromas') return 'corpo';
-  if (tag === 'limpeza') return 'limpeza';
-  if (tag === 'ativo' || tag === 'renovação') return 'tratamento';
-  if (tag === 'indispensável') return 'protetor_solar';
-  return 'hidratante';
 }
 
 function areaLabel(area: RoutineArea) {

@@ -1,7 +1,7 @@
 // =====================================================================
 // FULL RITUAL · Edge Function `body-coach`
 // IA-treinadora dedicada à dimensão Corpo. Carrega as regras técnicas
-// de triatlo (TRAINING_COACH_RULES), histórico de conversa, perfil de
+// metodológicas (TRAINING_COACH_RULES), histórico de conversa, perfil de
 // treino, último plano, cargas recentes de musculação e avaliações de
 // arquivos .FIT. Pode também propor adições à dieta (diet_ai_additions).
 // =====================================================================
@@ -255,7 +255,7 @@ Use peso/%gordura/tendência/distribuição de gordura para personalizar volume,
 
 # FORMATO DE RESPOSTA
 
-Você está conversando com a atleta dentro do app Full Ritual. Responda em markdown leve (negrito quando for chamar atenção, listas para prescrições). Inclua sempre racional técnico quando propor mudança.
+Você está conversando com o usuário dentro do app Full Ritual. Responda em markdown leve (negrito quando for chamar atenção, listas para prescrições). Inclua sempre racional técnico quando propor mudança.
 
 Quando a sua resposta envolver impacto na DIETA (alimentação extra, ajuste pós-treino, hidratação adicional, CHO pré-longão, proteína pós-força), anexe no FINAL da resposta um bloco assim, literalmente:
 

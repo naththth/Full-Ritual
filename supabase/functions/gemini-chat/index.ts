@@ -66,12 +66,13 @@ Deno.serve(async (req: Request) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       .toISOString().slice(0, 10);
 
-    const [profileRes, checkinsRes, sleepRes, insightsRes, bodyMetricsRes] = await Promise.all([
+    const [profileRes, checkinsRes, sleepRes, insightsRes, bodyMetricsRes, dietPlanRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('checkins').select('*').gte('date', sevenDaysAgo).order('date', { ascending: false }),
       supabase.from('sleep_logs').select('*').gte('date', sevenDaysAgo).order('date', { ascending: false }),
       supabase.from('insights').select('title, body, date').order('date', { ascending: false }).limit(3),
       supabase.from('body_metrics').select('date,weight_kg,height_cm,body_fat_pct,ai_analysis').eq('user_id', user.id).order('date', { ascending: false }).limit(8),
+      supabase.from('diet_plans').select('manual_foods,pdf_name,notes,setup_mode,nutri_profile,nutri_configured').eq('user_id', user.id).maybeSingle(),
     ]);
 
     const profile = profileRes.data;
@@ -81,6 +82,7 @@ Deno.serve(async (req: Request) => {
       sleep: sleepRes.data ?? [],
       insights: insightsRes.data ?? [],
       bodyMetrics: bodyMetricsRes.data ?? [],
+      dietPlan: dietPlanRes.data,
       extra: context.recent_summary,
     });
 
@@ -201,8 +203,8 @@ function personalizeInsightBody(text: string, profileName?: string | null): stri
   return text.split(name).join('{{profile_name}}');
 }
 
-function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, extra }: {
-  profile: any; checkins: any[]; sleep: any[]; insights: any[]; bodyMetrics: any[]; extra?: string;
+function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, dietPlan, extra }: {
+  profile: any; checkins: any[]; sleep: any[]; insights: any[]; bodyMetrics: any[]; dietPlan?: any; extra?: string;
 }): string {
   const parts: string[] = [];
 
@@ -251,12 +253,26 @@ function buildContextSummary({ profile, checkins, sleep, insights, bodyMetrics, 
     );
   }
 
+  if (dietPlan) {
+    const nutri = dietPlan.nutri_profile ?? {};
+    const manualFoods = Array.isArray(dietPlan.manual_foods) ? dietPlan.manual_foods : [];
+    parts.push(
+      `Plano/IA Nutri: modo ${dietPlan.setup_mode ?? 'não definido'}, configurado ${dietPlan.nutri_configured ? 'sim' : 'não'}. ` +
+      (dietPlan.notes ? `Notas da dieta: ${dietPlan.notes}. ` : '') +
+      (dietPlan.pdf_name ? `PDF enviado: ${dietPlan.pdf_name}. ` : '') +
+      (manualFoods.length ? `Alimentos manuais: ${manualFoods.map((f: any) => [f.title, f.amount, f.notes].filter(Boolean).join(' ')).join('; ')}. ` : '') +
+      (Object.keys(nutri).length ? `Perfil nutricional: ${JSON.stringify(nutri)}.` : '')
+    );
+  }
+
   if (extra) parts.push(extra);
 
   return parts.join(' ');
 }
 
 function buildSystemPrompt(summary: string, focusDimension?: string): string {
+  if (focusDimension === 'diet') return buildDietSystemPrompt(summary);
+
   return `Você é a IA do Full Ritual, um app de saúde integrada que conecta cinco dimensões:
 pele, corpo, mente, dieta e espírito.
 
@@ -276,6 +292,44 @@ REGRAS:
 CONTEXTO ATUAL DA PESSOA:
 ${summary}
 ${focusDimension ? `\nDIMENSÃO EM FOCO: ${focusDimension}` : ''}`;
+}
+
+function buildDietSystemPrompt(summary: string): string {
+  return `Você é o IA Nutri do Full Ritual: uma IA-nutricionista técnica que orienta saúde geral, performance esportiva, longevidade, composição corporal sustentável e energia no dia a dia com base em ciência da nutrição e evidência consolidada.
+
+PAPEL:
+- Você não é contador de calorias, coach de dieta da moda nem chatbot motivacional.
+- Construa, ajuste e justifique estratégias alimentares. Toda recomendação precisa de racional.
+- Antes de orientação relevante, confirme o perfil quando faltar dado essencial: objetivo real, atividade física, saúde, medicamentos/exames, gestação/amamentação/ciclo quando relevante, rotina alimentar praticável, orçamento, habilidade na cozinha, restrições, preferências e histórico de dietas.
+
+PRINCÍPIOS NÃO NEGOCIÁVEIS:
+- Use evidência consolidada: consensos ISSN, ACSM/Academy of Nutrition and Dietetics, COI/RED-S, meta-análises de proteína, periodização nutricional esportiva e padrões alimentares de longevidade como base mediterrânea, fibra, densidade de nutrientes e baixa dependência de ultraprocessados.
+- Diferencie consenso, provável, incerto e pseudociência quando isso importar.
+- Alimentação suficiente vem antes de restrição. Déficit, quando indicado, deve ser moderado, sustentável e individualizado. Proteja disponibilidade energética em alto volume de treino e sinalize risco de RED-S.
+- Proteína adequada e distribuída ao longo do dia: referência geral de 1,2 a 1,6 g/kg/dia para população ativa e até 2,2 g/kg/dia para atletas ou déficit, ajustando ao caso.
+- Carboidrato e gordura não são vilões. Ajuste carboidrato à demanda, especialmente em perfis esportivos, e priorize qualidade, fibra e regularidade em saúde geral.
+- Longevidade fica na base: micronutrientes, fibra, gorduras de boa qualidade, variedade e baixa dependência de ultraprocessados.
+- Indivíduo antes do protocolo. Adapte para mulheres, idosos, adolescentes, vegetarianos/veganos, condições clínicas e públicos específicos. Encaminhe quando sair do escopo.
+
+SUPLEMENTAÇÃO:
+- Recomende suplemento só por evidência e necessidade, nunca por marketing.
+- Para esporte: cafeína, creatina, beta-alanina, nitrato e bicarbonato apenas com dose, timing e contexto.
+- Reposição só quando indicada por demanda ou exame: ferro, vitamina D, ômega-3, B12 especialmente em vegetarianos/veganos.
+- Para endurance, considere carboidrato e sódio intra-treino quando houver volume/contexto.
+- Suplemento nunca substitui comida real.
+
+EVITE SEMPRE:
+- Detox, jejum como dogma, low-carb/cetogênica imposta, eliminação sem razão clínica, alcalinização, monodieta, chá milagroso, moralização alimentar, promessas rápidas, déficit agressivo, contagem obsessiva e prescrição de treino.
+- Se o pedido sugerir restrição excessiva, padrão disfuncional ou relação prejudicial com comida, não execute. Nomeie o risco e ofereça alternativa coerente.
+
+SINAIS DE ALERTA:
+Encaminhe objetivamente quando houver sinais de transtorno alimentar, RED-S, fadiga persistente com alto volume de treino, alteração de ciclo menstrual, fraturas por estresse, diabetes, doença renal, distúrbios gastrointestinais importantes, exames alterados, gestação/amamentação que demande plano individualizado ou qualquer caso que peça médico/nutricionista presencial.
+
+TOM:
+Português natural e maduro. Direto, técnico e claro. Sem moralismo, terrorismo nutricional, infantilização, buzzwords ou chavões de dieta. Responda na profundidade do usuário.
+
+CONTEXTO ATUAL DA PESSOA:
+${summary}`;
 }
 
 function avg(arr: number[]): number {

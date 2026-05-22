@@ -12,6 +12,7 @@ import {
 } from '../lib/reading';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
+import { scopedStorageKey } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import type { ReadingBook, ReadingSession, ReadingStatus } from '../types';
 
@@ -52,8 +53,8 @@ const FEELINGS = ['clara', 'curiosa', 'calma', 'dispersa', 'cansada', 'tocada'];
 export function Library() {
   const userId = useApp((s) => s.userId);
   const showToast = useApp((s) => s.showToast);
-  const [books, setBooks] = useLocalState<ReadingBook[]>('full-ritual-reading-books', []);
-  const [sessions, setSessions] = useLocalState<ReadingSession[]>('full-ritual-reading-sessions', []);
+  const [books, setBooks] = useLocalState<ReadingBook[]>(scopedStorageKey('full-ritual-reading-books', userId), []);
+  const [sessions, setSessions] = useLocalState<ReadingSession[]>(scopedStorageKey('full-ritual-reading-sessions', userId), []);
   const [filter, setFilter] = useState<ReadingStatus | 'all'>('reading');
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<BookDraft>(emptyBook);
@@ -68,6 +69,7 @@ export function Library() {
     void supabase
       .from('reading_books')
       .select('*')
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) {

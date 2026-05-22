@@ -6,7 +6,7 @@ export async function uploadImageOrPreview({
   file,
   prefix,
 }: {
-  bucket: 'avatars' | 'meals' | 'skin' | 'products' | 'labs';
+  bucket: 'avatars' | 'meals' | 'skin' | 'products' | 'labs' | 'diet';
   userId: string | null;
   file: File;
   prefix: string;

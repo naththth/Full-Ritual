@@ -9,6 +9,7 @@ type MenuItem = {
   label: string;
   screen: Screen;
   icon: Icon3DKind;
+  requiredDimension?: DimensionKey;
 };
 
 type DimensionItem = {
@@ -22,8 +23,8 @@ type DimensionItem = {
 const profileMenuItems: MenuItem[] = [
   { label: 'Meu perfil', screen: 'profile', icon: 'health' },
   { label: 'Configurar dimensões', screen: 'onboarding', icon: 'home' },
-  { label: 'Biblioteca', screen: 'library', icon: 'library' },
-  { label: 'Produtos', screen: 'products', icon: 'skincare' },
+  { label: 'Biblioteca', screen: 'library', icon: 'library', requiredDimension: 'mind' },
+  { label: 'Produtos', screen: 'products', icon: 'skincare', requiredDimension: 'skin' },
 ];
 
 const healthMenuItems: MenuItem[] = [
@@ -54,6 +55,10 @@ export function NavigationMenu() {
   const visibleDimensionItems = dimensionItems.filter((item) => {
     if (!item.dimension) return true;
     return activeDimensions.includes(item.dimension);
+  });
+  const visibleProfileMenuItems = profileMenuItems.filter((item) => {
+    if (!item.requiredDimension) return true;
+    return activeDimensions.includes(item.requiredDimension);
   });
 
   const navigate = (itemScreen: Screen, dimension?: DimensionKey) => {
@@ -111,7 +116,7 @@ export function NavigationMenu() {
           {profileOpen && (
             <div className="nav-profile-menu" role="menu" aria-label="Menu do perfil">
               <p>{profile?.name ?? 'Perfil'}</p>
-              {profileMenuItems.map((item) => (
+              {visibleProfileMenuItems.map((item) => (
                 <button key={item.screen} type="button" role="menuitem" onClick={() => navigate(item.screen)}>
                   <Icon3D kind={item.icon} size={20} />
                   <span>{item.label}</span>

@@ -29,9 +29,9 @@ export function Insight() {
 
     void Promise.all([
       supabase.from('insights').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(6),
-      supabase.from('daily_scores').select('*').gte('date', since).order('date', { ascending: true }),
-      supabase.from('sleep_logs').select('*').gte('date', since).order('date', { ascending: true }),
-      supabase.from('checkins').select('*').gte('date', since).order('date', { ascending: true }),
+      supabase.from('daily_scores').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
+      supabase.from('sleep_logs').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
+      supabase.from('checkins').select('*').eq('user_id', userId).gte('date', since).order('date', { ascending: true }),
     ]).then(([insightRes, scoreRes, sleepRes, checkinRes]) => {
       if (insightRes.error) console.error(insightRes.error);
       if (scoreRes.error) console.error(scoreRes.error);

@@ -1533,6 +1533,345 @@ input[type="password"]::placeholder { color: rgba(245, 238, 223, 0.45); }
   border: 1px solid rgba(84, 104, 62, 0.18);
 }
 
+.diet-plan-card {
+  border-color: color-mix(in srgb, var(--diet) 20%, rgba(74,44,34,0.08));
+}
+
+.diet-plan-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.diet-nutri-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.diet-nutri-field {
+  display: grid;
+  gap: 6px;
+}
+
+.diet-nutri-field span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--diet) 72%, var(--chocolate));
+}
+
+.diet-pdf-link {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--diet) 28%, transparent);
+  background: color-mix(in srgb, var(--diet) 10%, rgba(255,255,255,0.72));
+  color: var(--diet-deep);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* ── totais do plano ── */
+.diet-totals-card {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--diet) 12%, rgba(255,252,244,0.95));
+  border: 1px solid color-mix(in srgb, var(--diet) 28%, transparent);
+  display: grid;
+  gap: 12px;
+}
+
+.diet-totals-card .eyebrow {
+  color: var(--diet);
+}
+
+.diet-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.diet-macro-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px;
+  border-radius: 14px;
+  background: rgba(255,252,244,0.8);
+  border: 1px solid rgba(74,44,34,0.1);
+  gap: 2px;
+}
+
+.diet-macro-chip--highlight {
+  background: var(--diet);
+  border-color: var(--diet);
+  grid-column: span 1;
+}
+
+.diet-macro-chip--highlight .diet-macro-chip__value,
+.diet-macro-chip--highlight .diet-macro-chip__label {
+  color: var(--ivory);
+}
+
+.diet-macro-chip__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--chocolate);
+  line-height: 1.1;
+}
+
+.diet-macro-chip__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(74,44,34,0.55);
+}
+
+/* ── formulário de alimento ── */
+.diet-food-form {
+  padding: 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--diet) 6%, rgba(255,252,244,0.7));
+  border: 1px dashed color-mix(in srgb, var(--diet) 40%, transparent);
+}
+
+.diet-search-wrap {
+  position: relative;
+}
+
+.diet-search-loading {
+  font-size: 11px;
+  color: rgba(74,44,34,0.5);
+  padding: 4px 0 0 4px;
+  display: block;
+}
+
+.diet-search-results {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--ivory);
+  border: 1px solid rgba(74,44,34,0.14);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(74,44,34,0.12);
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.diet-search-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  display: grid;
+  gap: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.diet-search-item:hover,
+.diet-search-item:focus {
+  background: color-mix(in srgb, var(--diet) 10%, transparent);
+}
+
+.diet-search-item__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chocolate);
+}
+
+.diet-search-item__brand {
+  font-size: 11px;
+  color: rgba(74,44,34,0.5);
+}
+
+.diet-search-item__kcal {
+  font-size: 11px;
+  color: var(--diet);
+  font-weight: 600;
+}
+
+.diet-food-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.diet-macros-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.diet-field-label {
+  display: grid;
+  gap: 4px;
+}
+
+.diet-field-label span {
+  font-size: 10px;
+  color: rgba(74,44,34,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+/* select estilizado dentro do formulário de dieta */
+.diet-food-form .field[data-select],
+.diet-food-form select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a2c22' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.diet-macro-preview {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--diet) 10%, rgba(255,252,244,0.9));
+  border: 1px solid color-mix(in srgb, var(--diet) 22%, transparent);
+  font-size: 12px;
+  color: var(--chocolate);
+  flex-wrap: wrap;
+}
+
+.diet-macro-preview strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--diet);
+}
+
+.diet-macro-preview__qty {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(74,44,34,0.45);
+}
+
+/* ── grupos de refeição ── */
+.diet-meal-group {
+  display: grid;
+  gap: 6px;
+}
+
+.diet-meal-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px;
+}
+
+.diet-meal-group__total {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--diet);
+}
+
+.diet-food-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(74,44,34,0.09);
+  background: rgba(255,252,244,0.72);
+}
+
+.diet-food-item__info {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.diet-food-item__info strong {
+  font-size: 13px;
+  color: var(--chocolate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diet-food-item__info small {
+  font-size: 11px;
+  color: rgba(74,44,34,0.5);
+}
+
+.diet-food-item__qty {
+  font-size: 11px;
+  color: rgba(74,44,34,0.45);
+}
+
+.diet-food-item__macros {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.diet-food-item__macros span {
+  font-size: 11px;
+  color: rgba(74,44,34,0.55);
+}
+
+.diet-food-item__kcal {
+  font-weight: 700 !important;
+  color: var(--diet) !important;
+}
+
+.diet-manual-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diet-manual-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(74,44,34,0.1);
+  background: rgba(255,252,244,0.72);
+}
+
+.diet-manual-item span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.diet-manual-item strong,
+.diet-manual-item small {
+  display: block;
+}
+
+.diet-manual-item strong {
+  color: var(--chocolate);
+}
+
+.diet-manual-item small {
+  color: rgba(74,44,34,0.58);
+  line-height: 1.35;
+}
+
 .diet-ai-card,
 .meal-ai-additions {
   display: grid;
