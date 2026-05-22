@@ -10,6 +10,11 @@ import { Login } from './screens/Login';
 import { Chat } from './screens/Chat';
 import { BodyCoach } from './screens/BodyCoach';
 import { BodyMetrics } from './screens/BodyMetrics';
+import { Labs } from './screens/Labs';
+import { Supplements } from './screens/Supplements';
+import { Vitals } from './screens/Vitals';
+import { Pain } from './screens/Pain';
+import { Health } from './screens/Health';
 import { Diet } from './screens/Diet';
 import { Evolution } from './screens/Evolution';
 import { Mind } from './screens/Mind';
@@ -102,6 +107,11 @@ export default function App() {
           {screen === 'chat' && <Chat />}
           {screen === 'body_coach' && <BodyCoach />}
           {screen === 'body_metrics' && <BodyMetrics />}
+          {screen === 'labs' && <Labs />}
+          {screen === 'supplements' && <Supplements />}
+          {screen === 'vitals' && <Vitals />}
+          {screen === 'pain' && <Pain />}
+          {screen === 'health' && <Health />}
           {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}
           {screen === 'dimension' && focusedDimension === 'body' && <Body />}
           {screen === 'dimension' && focusedDimension === 'mind' && <Mind />}

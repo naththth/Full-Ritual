@@ -57,7 +57,7 @@ const SPIRIT: { value: SpiritTheme; label: string }[] = [
   { value: 'criatividade',    label: 'criatividade' },
 ];
 
-type SettingsIconKind = 'skincare' | 'library' | 'body';
+type SettingsIconKind = 'skincare' | 'library' | 'body' | 'labs' | 'supplements';
 
 function SettingsIcon({ kind }: { kind: SettingsIconKind }) {
   if (kind === 'skincare') {
@@ -80,6 +80,30 @@ function SettingsIcon({ kind }: { kind: SettingsIconKind }) {
         <path d="M12 12.8h3.2" />
         <path d="M12 16.2h3.2" />
         <path d="M21 12v6.5l1.3-1 1.3 1V12" />
+      </svg>
+    );
+  }
+
+  if (kind === 'supplements') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <rect x="8" y="14" width="16" height="10" rx="5" />
+        <rect x="8" y="14" width="8" height="10" fill="currentColor" opacity="0.3" />
+        <path d="M16 14v10" />
+        <circle cx="22" cy="9" r="3" />
+        <path d="M22 7v4M20 9h4" />
+      </svg>
+    );
+  }
+
+  if (kind === 'labs') {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path d="M13 8v8l-4 8h14l-4-8V8" />
+        <path d="M11 8h10" />
+        <path d="M10.5 19.5h11" />
+        <circle cx="14" cy="22" r="1" fill="currentColor" />
+        <circle cx="18" cy="20.5" r="0.8" fill="currentColor" />
       </svg>
     );
   }
@@ -316,6 +340,19 @@ export function Profile() {
 
       <section className="card stack settings-card">
         <span className="eyebrow">configuração · app</span>
+        <button className="settings-row settings-row--mind" onClick={() => goTo('health')}>
+          <span className="settings-mark">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <path d="M16 7c-4 0-7 2.7-7 6 0 5 7 12 7 12s7-7 7-12c0-3.3-3-6-7-6z" />
+              <path d="M13 15h6M16 12v6" />
+            </svg>
+          </span>
+          <span>
+            <strong>Hub de Saúde</strong>
+            <small>exames, suplementos, sinais vitais e dores</small>
+          </span>
+          <SettingsArrow />
+        </button>
         <button className="settings-row settings-row--skin" onClick={() => goTo('products')}>
           <span className="settings-mark"><SettingsIcon kind="skincare" /></span>
           <span>
@@ -337,6 +374,48 @@ export function Profile() {
           <span>
             <strong>Peso, altura e composição</strong>
             <small>registrar medidas, foto pra IA analisar e ver evolução</small>
+          </span>
+          <SettingsArrow />
+        </button>
+        <button className="settings-row settings-row--body" onClick={() => goTo('pain')}>
+          <span className="settings-mark">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <circle cx="16" cy="16" r="9" />
+              <path d="M16 12v5" />
+              <circle cx="16" cy="20" r="0.8" fill="currentColor" />
+            </svg>
+          </span>
+          <span>
+            <strong>Dor e lesões</strong>
+            <small>registrar dores, intensidade e acompanhar recuperação</small>
+          </span>
+          <SettingsArrow />
+        </button>
+        <button className="settings-row settings-row--spirit" onClick={() => goTo('vitals')}>
+          <span className="settings-mark">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <polyline points="4,16 8,10 12,20 16,8 20,18 24,12 28,16" />
+            </svg>
+          </span>
+          <span>
+            <strong>Sinais vitais</strong>
+            <small>FC repouso, HRV, passos · importar CSV do Garmin ou Apple Health</small>
+          </span>
+          <SettingsArrow />
+        </button>
+        <button className="settings-row settings-row--body" onClick={() => goTo('supplements')}>
+          <span className="settings-mark"><SettingsIcon kind="supplements" /></span>
+          <span>
+            <strong>Suplementos e medicamentos</strong>
+            <small>aderência diária, doses e horários de uso contínuo</small>
+          </span>
+          <SettingsArrow />
+        </button>
+        <button className="settings-row settings-row--mind" onClick={() => goTo('labs')}>
+          <span className="settings-mark"><SettingsIcon kind="labs" /></span>
+          <span>
+            <strong>Exames laboratoriais</strong>
+            <small>foto do laudo, IA extrai marcadores e rastreia tendências</small>
           </span>
           <SettingsArrow />
         </button>

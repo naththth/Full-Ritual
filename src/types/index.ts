@@ -354,6 +354,28 @@ export interface Insight {
   created_at: string;
 }
 
+// ---------- EXAMES LABORATORIAIS ----------
+export type LabMarkerStatus = 'normal' | 'low' | 'high' | 'critical';
+
+export interface LabMarker {
+  value: number;
+  unit: string;
+  ref_min?: number | null;
+  ref_max?: number | null;
+  status: LabMarkerStatus;
+}
+
+export interface LabResult {
+  id: string;
+  user_id: string;
+  date: string;
+  lab_name: string | null;
+  photo_url: string | null;
+  markers: Record<string, LabMarker>;
+  notes: string | null;
+  created_at: string;
+}
+
 // ---------- SCORES DIÁRIOS (view materializada) ----------
 export interface DailyScore {
   user_id: string;

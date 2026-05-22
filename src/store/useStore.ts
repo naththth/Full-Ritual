@@ -20,7 +20,12 @@ export type Screen =
   | 'evolution'
   | 'chat'
   | 'body_coach'
-  | 'body_metrics';
+  | 'body_metrics'
+  | 'labs'
+  | 'supplements'
+  | 'vitals'
+  | 'pain'
+  | 'health';
 
 interface NavigationEntry {
   screen: Screen;

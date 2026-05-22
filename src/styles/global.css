@@ -3232,6 +3232,645 @@ input[type="range"] {
   color: rgba(74, 44, 34, 0.42);
 }
 
+/* ── Health Hub ──────────────────────────────────────────────────── */
+.health-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-status-card {
+  border-radius: 20px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--status-color) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--status-color) 20%, transparent);
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  position: relative;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.health-status-card:active { opacity: 0.75; }
+
+.health-status-card--alert {
+  border-color: color-mix(in srgb, var(--status-color) 45%, transparent);
+}
+
+.health-status-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-color);
+}
+
+.health-status-value {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--status-color);
+  line-height: 1;
+}
+
+.health-status-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(74, 44, 34, 0.5);
+}
+
+.health-status-sub {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--status-color) 60%, var(--chocolate));
+}
+
+.health-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-nav-card {
+  border-radius: 20px;
+  padding: 20px 16px;
+  background: var(--paper);
+  border: 1px solid rgba(74, 44, 34, 0.1);
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.health-nav-card:hover,
+.health-nav-card:active {
+  background: color-mix(in srgb, var(--section-color) 6%, var(--paper));
+  border-color: color-mix(in srgb, var(--section-color) 30%, transparent);
+}
+
+.health-nav-glyph {
+  font-family: var(--display);
+  font-size: 26px;
+  color: var(--section-color);
+  line-height: 1;
+}
+
+.health-nav-title {
+  font-size: var(--fs-body);
+  color: var(--chocolate);
+  line-height: 1.3;
+}
+
+.health-nav-sub {
+  font-size: 11px;
+  color: rgba(74, 44, 34, 0.5);
+  line-height: 1.4;
+}
+
+.health-tips-card {
+  background: rgba(31, 71, 81, 0.04);
+  border: 1px dashed rgba(31, 71, 81, 0.16);
+}
+
+.health-tips-list {
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.health-tips-list li {
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+  color: rgba(74, 44, 34, 0.7);
+}
+
+/* Home → Health card */
+.home-health-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.home-health-pill {
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid rgba(74, 44, 34, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+}
+
+.home-health-pill:hover { border-color: rgba(74, 44, 34, 0.22); }
+
+.home-health-pill-icon {
+  font-family: var(--display);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.home-health-pill-text strong {
+  display: block;
+  font-size: 13px;
+}
+
+.home-health-pill-text span {
+  font-size: 11px;
+  color: rgba(74, 44, 34, 0.5);
+}
+
+/* ── Pain & Injuries ─────────────────────────────────────────────── */
+.pain-regions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pain-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(74, 44, 34, 0.45);
+  margin-top: 4px;
+}
+
+.pain-card {
+  border-left: 3px solid var(--intensity-color);
+}
+
+.pain-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pain-intensity-badge {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 44px;
+  text-align: center;
+}
+
+.pain-intensity-badge span {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.pain-card-info {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.pain-resolve-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(74, 44, 34, 0.2);
+  color: rgba(74, 44, 34, 0.4);
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.pain-resolve-btn:hover {
+  border-color: var(--diet);
+  color: var(--diet);
+  background: color-mix(in srgb, var(--diet) 10%, transparent);
+}
+
+.pain-resolved-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--diet) 14%, transparent);
+  color: var(--diet);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Vitals ──────────────────────────────────────────────────────── */
+.vitals-import-card {
+  border: 1.5px dashed rgba(31, 71, 81, 0.22);
+  background: rgba(31, 71, 81, 0.03);
+}
+
+.vitals-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vitals-field {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: rgba(31, 71, 81, 0.04);
+  border-radius: 14px;
+  cursor: text;
+}
+
+.vitals-field > span:first-child {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.vitals-input-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.vitals-input-row input {
+  flex: 1;
+  width: 100%;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  color: var(--chocolate);
+}
+
+.vitals-unit {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(74, 44, 34, 0.45);
+  white-space: nowrap;
+}
+
+.vitals-goal-label {
+  font-size: 10px;
+  color: rgba(74, 44, 34, 0.4);
+}
+
+.vitals-mini-chart {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 3px;
+  height: 64px;
+  align-items: end;
+}
+
+.vitals-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.vitals-bar-track {
+  flex: 1;
+  width: 100%;
+  background: rgba(31, 71, 81, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.vitals-bar-fill {
+  border-radius: 4px;
+  transition: height 0.3s ease;
+}
+
+.vitals-bar-label {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: rgba(74, 44, 34, 0.4);
+}
+
+/* ── Supplements ─────────────────────────────────────────────────── */
+.suppl-summary-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.suppl-summary-ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: conic-gradient(var(--diet) calc(var(--pct) * 360deg), rgba(31,71,81,0.08) 0);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.suppl-summary-ring::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.suppl-summary-number {
+  position: relative;
+  z-index: 1;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--diet);
+  line-height: 1;
+}
+
+.suppl-summary-label {
+  display: none;
+}
+
+.suppl-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suppl-pending-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--cat-color) 12%, var(--paper));
+  color: color-mix(in srgb, var(--cat-color) 70%, var(--chocolate));
+  border: 1px solid color-mix(in srgb, var(--cat-color) 24%, transparent);
+}
+
+.suppl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: opacity 0.2s;
+}
+
+.suppl-item--taken { opacity: 0.55; }
+
+.suppl-check {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--cat-color);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cat-color);
+  transition: background 0.15s;
+}
+
+.suppl-item--taken .suppl-check {
+  background: var(--cat-color);
+  color: var(--ivory);
+}
+
+.suppl-info {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.suppl-archive {
+  color: rgba(74, 44, 34, 0.3);
+  font-size: 20px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: color 0.15s;
+}
+
+.suppl-archive:hover { color: var(--body); }
+
+.suppl-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.suppl-food-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+}
+
+/* ── Labs ────────────────────────────────────────────────────────── */
+.labs-upload-card {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(31, 71, 81, 0.12), transparent 44%),
+    var(--paper);
+}
+
+.labs-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.labs-photo-btn { min-height: 52px; }
+
+.labs-analyzing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.labs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(245, 238, 223, 0.35);
+  border-top-color: var(--ivory);
+  border-radius: 50%;
+  animation: labs-spin 0.8s linear infinite;
+}
+
+@keyframes labs-spin { to { transform: rotate(360deg); } }
+
+.labs-markers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.labs-marker-card {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--marker-color) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--marker-color) 22%, transparent);
+  display: grid;
+  gap: 4px;
+}
+
+.labs-marker-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(74, 44, 34, 0.55);
+}
+
+.labs-marker-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.labs-marker-value strong {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--marker-color);
+  line-height: 1;
+}
+
+.labs-marker-value span {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(74, 44, 34, 0.5);
+}
+
+.labs-marker-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--marker-color) 80%, var(--chocolate));
+}
+
+.labs-marker-ref,
+.labs-marker-note {
+  font-size: 10px;
+  color: rgba(74, 44, 34, 0.42);
+  line-height: 1.4;
+}
+
+.labs-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.labs-result-row:active { opacity: 0.75; }
+
+.labs-result-info {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.labs-badge {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.labs-badge--ok {
+  background: color-mix(in srgb, var(--diet) 14%, var(--paper));
+  color: var(--diet);
+  border: 1px solid color-mix(in srgb, var(--diet) 30%, transparent);
+}
+
+.labs-badge--alert {
+  background: color-mix(in srgb, var(--body) 14%, var(--paper));
+  color: var(--body);
+  border: 1px solid color-mix(in srgb, var(--body) 30%, transparent);
+}
+
+.labs-empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: rgba(74, 44, 34, 0.45);
+}
+
+.labs-empty-glyph {
+  font-family: var(--display);
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.labs-trend-card {
+  border-left: 3px solid var(--marker-color);
+}
+
+.labs-trend-dots {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.labs-trend-point {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.labs-trend-point span {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(74, 44, 34, 0.45);
+}
+
+.labs-trend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot-color);
+}
+
+.labs-trend-delta {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.labs-trend-delta--up {
+  background: color-mix(in srgb, var(--body) 12%, var(--paper));
+  color: var(--body);
+}
+
+.labs-trend-delta--down {
+  background: color-mix(in srgb, var(--diet) 12%, var(--paper));
+  color: var(--diet);
+}
+
 /* ── Profile Goals ───────────────────────────────────────────────── */
 .profile-goals-grid {
   display: grid;

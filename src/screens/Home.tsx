@@ -363,6 +363,43 @@ export function Home() {
         onRefresh={loadWeather}
       />
 
+      <section className="stack">
+        <span className="eyebrow">saúde · acessar</span>
+        <div className="home-health-card">
+          <button className="home-health-pill" onClick={() => goTo('labs')}>
+            <span className="home-health-pill-icon" style={{ color: 'var(--mind)' }}>◐</span>
+            <div className="home-health-pill-text">
+              <strong>Exames</strong>
+              <span>laudos e marcadores</span>
+            </div>
+          </button>
+          <button className="home-health-pill" onClick={() => goTo('supplements')}>
+            <span className="home-health-pill-icon" style={{ color: 'var(--diet)' }}>◍</span>
+            <div className="home-health-pill-text">
+              <strong>Suplementos</strong>
+              <span>aderência diária</span>
+            </div>
+          </button>
+          <button className="home-health-pill" onClick={() => goTo('vitals')}>
+            <span className="home-health-pill-icon" style={{ color: 'var(--body)' }}>◑</span>
+            <div className="home-health-pill-text">
+              <strong>Sinais vitais</strong>
+              <span>FC, HRV, passos</span>
+            </div>
+          </button>
+          <button className="home-health-pill" onClick={() => goTo('pain')}>
+            <span className="home-health-pill-icon" style={{ color: 'var(--spirit)' }}>○</span>
+            <div className="home-health-pill-text">
+              <strong>Dor e lesões</strong>
+              <span>registro e evolução</span>
+            </div>
+          </button>
+        </div>
+        <button className="btn btn--secondary btn--sm" style={{ alignSelf: 'flex-end' }} onClick={() => goTo('health')}>
+          visão geral →
+        </button>
+      </section>
+
       <button className="card home-ai-card" onClick={() => goTo('chat')}>
         <span className="eyebrow">IA · conversa</span>
         <strong>abrir chat com presença</strong>
