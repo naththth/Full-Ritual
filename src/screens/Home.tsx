@@ -232,7 +232,6 @@ export function Home() {
 
   useEffect(() => {
     if (!hasSupabase || !userId) {
-      // Compute streak from localStorage
       let count = 0;
       let date = new Date();
       while (count < 365) {
@@ -255,8 +254,6 @@ export function Home() {
       supabase.from('daily_scores').select('*').eq('date', selectedDate).maybeSingle(),
       supabase.from('checkins').select('date').gte('date', since).order('date', { ascending: false }),
     ]).then(([insightRes, scoreRes, checkinRes]) => {
-      if (insightRes.error) console.error(insightRes.error);
-      if (scoreRes.error) console.error(scoreRes.error);
       setLatestInsight((insightRes.data as Insight | null) ?? null);
       setDailyScore((scoreRes.data as DailyScore | null) ?? null);
 
@@ -280,17 +277,8 @@ export function Home() {
           <button
             onClick={() => goTo('profile')}
             aria-label="Perfil"
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: '50%',
-              background: profile?.photo_url ? `url(${profile.photo_url}) center/cover` : 'var(--camel)',
-              display: 'grid',
-              placeItems: 'center',
-              fontFamily: 'var(--display)',
-              fontSize: 22,
-              color: 'var(--chocolate)',
-            }}
+            className="home-avatar-btn"
+            style={profile?.photo_url ? { background: `url(${profile.photo_url}) center/cover` } : undefined}
           >
             {!profile?.photo_url && (profile?.name?.[0] ?? 'N')}
           </button>

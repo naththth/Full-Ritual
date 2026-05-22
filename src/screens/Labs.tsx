@@ -1,6 +1,8 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { BackButton } from '../components/BackButton';
-import { isoToday } from '../lib/dates';
+import { Icon3DLarge } from '../components/Icon3D';
+import { formatDateLong, isoToday } from '../lib/dates';
+import { fileToBase64 } from '../lib/files';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
@@ -82,6 +84,10 @@ export function Labs() {
       showToast('faça login para analisar laudos.');
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('arquivo muito grande. máximo 10 MB.');
+      return;
+    }
     setAnalyzing(true);
     try {
       const photoUrl = await uploadImageOrPreview({
@@ -94,7 +100,7 @@ export function Labs() {
       const base64 = await fileToBase64(file);
       const { data, error } = await supabase.functions.invoke('analyze-lab-photo', {
         body: {
-          image_base64: base64.split(',')[1],
+          image_base64: base64,
           mime_type: file.type,
           date: draftDate,
           lab_name: draftLab || undefined,
@@ -237,7 +243,7 @@ export function Labs() {
       {/* History */}
       {!loading && results.length === 0 && !draft && (
         <div className="labs-empty">
-          <span className="labs-empty-glyph">◐</span>
+          <Icon3DLarge kind="labs" size={64} className="labs-empty-glyph" />
           <p>Nenhum exame ainda. Envie a foto de um laudo para começar.</p>
         </div>
       )}
@@ -254,7 +260,7 @@ export function Labs() {
                 onClick={() => setSelectedResult(result)}
               >
                 <div className="labs-result-info">
-                  <strong>{formatDate(result.date)}</strong>
+                  <strong>{formatDateLong(result.date)}</strong>
                   <span className="t-body-sm muted">{result.lab_name ?? 'laboratório'} · {Object.keys(result.markers).length} marcadores</span>
                 </div>
                 {abn > 0 ? (
@@ -279,7 +285,7 @@ function LabDetail({ result, onBack }: { result: LabResult; onBack: () => void }
     <div className="screen stack-md">
       <header className="screen-header stack">
         <button className="back-button" onClick={onBack} aria-label="Voltar">←</button>
-        <span className="eyebrow">{result.lab_name ?? 'exame'} · {formatDate(result.date)}</span>
+        <span className="eyebrow">{result.lab_name ?? 'exame'} · {formatDateLong(result.date)}</span>
         <h1 className="t-display-lg">
           Detalhes do <em className="t-display-italic">laudo.</em>
         </h1>
@@ -396,17 +402,3 @@ function LabTrends({ results }: { results: LabResult[] }) {
   );
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function formatDate(iso: string) {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
-}

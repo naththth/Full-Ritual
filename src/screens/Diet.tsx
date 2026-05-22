@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import CircleButton from '../components/CircleButton';
 import { CyclePhaseBanner } from '../components/CyclePhaseBanner';
 import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
@@ -183,7 +183,7 @@ export function Diet() {
         </section>
       )}
 
-      <section className="card diet-water-card stack" style={{ '--dim': 'var(--diet)' } as React.CSSProperties}>
+      <section className="card diet-water-card stack" style={{ '--dim': 'var(--diet)' } as CSSProperties}>
         <span className="eyebrow">água e recuperação</span>
         <div className="t-display-md">
           {(diet.water * 0.5).toFixed(1).replace('.', ',')}L de {String(target).replace('.', ',')}L
@@ -212,7 +212,7 @@ export function Diet() {
           <details
             key={meal.id}
             className="dimension-panel dimension-panel--diet card stack meal-panel"
-            style={{ '--panel-dim': 'var(--diet)' } as React.CSSProperties}
+            style={{ '--panel-dim': 'var(--diet)' } as CSSProperties}
           >
             <summary>
               <span>

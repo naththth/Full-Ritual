@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { ROUTINES, getRoutineTasks, type RoutineArea, type RoutinePeriod } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
@@ -117,7 +117,7 @@ export function Ritual() {
                 return next;
               });
             }}
-            style={{ '--panel-dim': 'var(--skin)' } as React.CSSProperties}
+            style={{ '--panel-dim': 'var(--skin)' } as CSSProperties}
           >
             <summary>
               <span>

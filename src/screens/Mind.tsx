@@ -170,7 +170,7 @@ export function Mind() {
 
   useEffect(() => {
     if (!hasSupabase || !userId) return;
-    supabase
+    void supabase
       .from('reading_books')
       .select('*')
       .order('updated_at', { ascending: false })

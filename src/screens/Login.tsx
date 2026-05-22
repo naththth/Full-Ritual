@@ -47,19 +47,6 @@ export function Login() {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '14px 18px',
-    background: 'rgba(245,238,223,0.10)',
-    border: '1px solid rgba(245,238,223,0.20)',
-    color: 'var(--ivory)',
-    borderRadius: 999,
-    fontSize: 14,
-    textAlign: 'center',
-    outline: 'none',
-    boxSizing: 'border-box',
-  };
-
   return (
     <div
       style={{
@@ -114,7 +101,7 @@ export function Login() {
           placeholder="seu email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={inputStyle}
+          className="login-input"
         />
         <input
           type="password"
@@ -122,7 +109,7 @@ export function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && authenticate('signin')}
-          style={inputStyle}
+          className="login-input"
         />
         <button
           className="btn btn--full"

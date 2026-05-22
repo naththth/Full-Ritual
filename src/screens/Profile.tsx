@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BackButton } from '../components/BackButton';
+import { Icon3D } from '../components/Icon3D';
 import { useApp } from '../store/useStore';
 import { supabase, hasSupabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
@@ -56,70 +57,6 @@ const SPIRIT: { value: SpiritTheme; label: string }[] = [
   { value: 'natureza',        label: 'natureza' },
   { value: 'criatividade',    label: 'criatividade' },
 ];
-
-type SettingsIconKind = 'skincare' | 'library' | 'body' | 'labs' | 'supplements';
-
-function SettingsIcon({ kind }: { kind: SettingsIconKind }) {
-  if (kind === 'skincare') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <path d="M11.5 25.5h9" />
-        <path d="M13 11.5h6v14h-6z" />
-        <path d="M13.8 8.2h4.4v3.3h-4.4z" />
-        <path d="M14.7 6.2h2.6" />
-        <path d="M16 15.2c2 1.7 3 3.3 3 4.8a3 3 0 0 1-6 0c0-1.5 1-3.1 3-4.8Z" />
-      </svg>
-    );
-  }
-
-  if (kind === 'library') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <path d="M9 8.2h6.2c1.3 0 2.4.4 3.1 1.2v16.4c-.7-.8-1.8-1.2-3.1-1.2H9z" />
-        <path d="M18.3 9.4c.7-.8 1.8-1.2 3.1-1.2H23v16.4h-1.6c-1.3 0-2.4.4-3.1 1.2" />
-        <path d="M12 12.8h3.2" />
-        <path d="M12 16.2h3.2" />
-        <path d="M21 12v6.5l1.3-1 1.3 1V12" />
-      </svg>
-    );
-  }
-
-  if (kind === 'supplements') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <rect x="8" y="14" width="16" height="10" rx="5" />
-        <rect x="8" y="14" width="8" height="10" fill="currentColor" opacity="0.3" />
-        <path d="M16 14v10" />
-        <circle cx="22" cy="9" r="3" />
-        <path d="M22 7v4M20 9h4" />
-      </svg>
-    );
-  }
-
-  if (kind === 'labs') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <path d="M13 8v8l-4 8h14l-4-8V8" />
-        <path d="M11 8h10" />
-        <path d="M10.5 19.5h11" />
-        <circle cx="14" cy="22" r="1" fill="currentColor" />
-        <circle cx="18" cy="20.5" r="0.8" fill="currentColor" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <path d="M16 7.2v17.6" />
-      <path d="M11.2 10.8h9.6" />
-      <path d="M12.8 24.8h6.4" />
-      <path d="M9.2 13.2 6 20h6.4z" />
-      <path d="m22.8 13.2-3.2 6.8H26z" />
-      <path d="M7.8 20c.9 1.1 2.2 1.6 3.8 0" />
-      <path d="M21.2 20c.9 1.1 2.2 1.6 3.8 0" />
-    </svg>
-  );
-}
 
 function SettingsArrow() {
   return (
@@ -289,13 +226,8 @@ export function Profile() {
         <span className="eyebrow">identidade</span>
         <div className="row" style={{ gap: 16 }}>
           <label
-            style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: photoUrl ? `url(${photoUrl}) center/cover` : 'var(--camel)',
-              display: 'grid', placeItems: 'center',
-              fontFamily: 'var(--display)', fontSize: 32, color: 'var(--chocolate)',
-              cursor: 'pointer', flexShrink: 0,
-            }}
+            className="profile-avatar-label"
+            style={photoUrl ? { background: `url(${photoUrl}) center/cover` } : undefined}
           >
             {!photoUrl && (name[0] ?? '?')}
             <input
@@ -305,7 +237,7 @@ export function Profile() {
               style={{ display: 'none' }}
             />
           </label>
-          <div style={{ flex: 1 }} className="stack">
+          <div className="stack" style={{ flex: 1 }}>
             <input
               className="field"
               placeholder="nome"
@@ -324,7 +256,7 @@ export function Profile() {
 
         <div>
           <span className="eyebrow">tipo de pele</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          <div className="chip-wrap" style={{ marginTop: 8 }}>
             {SKIN_TYPES.map((t) => (
               <button
                 key={t.value}
@@ -341,12 +273,7 @@ export function Profile() {
       <section className="card stack settings-card">
         <span className="eyebrow">configuração · app</span>
         <button className="settings-row settings-row--mind" onClick={() => goTo('health')}>
-          <span className="settings-mark">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <path d="M16 7c-4 0-7 2.7-7 6 0 5 7 12 7 12s7-7 7-12c0-3.3-3-6-7-6z" />
-              <path d="M13 15h6M16 12v6" />
-            </svg>
-          </span>
+          <Icon3D kind="health" size={42} />
           <span>
             <strong>Hub de Saúde</strong>
             <small>exames, suplementos, sinais vitais e dores</small>
@@ -354,7 +281,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--skin" onClick={() => goTo('products')}>
-          <span className="settings-mark"><SettingsIcon kind="skincare" /></span>
+          <Icon3D kind="skincare" size={42} />
           <span>
             <strong>Produtos e rotina skincare</strong>
             <small>cadastro, frequência e regeneração da ordem de uso</small>
@@ -362,7 +289,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--mind" onClick={() => goTo('library')}>
-          <span className="settings-mark"><SettingsIcon kind="library" /></span>
+          <Icon3D kind="library" size={42} />
           <span>
             <strong>Biblioteca e leitura</strong>
             <small>importar Goodreads, cadastrar livros e registrar páginas</small>
@@ -370,7 +297,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--body" onClick={() => goTo('body_metrics')}>
-          <span className="settings-mark"><SettingsIcon kind="body" /></span>
+          <Icon3D kind="body" size={42} />
           <span>
             <strong>Peso, altura e composição</strong>
             <small>registrar medidas, foto pra IA analisar e ver evolução</small>
@@ -378,13 +305,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--body" onClick={() => goTo('pain')}>
-          <span className="settings-mark">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <circle cx="16" cy="16" r="9" />
-              <path d="M16 12v5" />
-              <circle cx="16" cy="20" r="0.8" fill="currentColor" />
-            </svg>
-          </span>
+          <Icon3D kind="pain" size={42} />
           <span>
             <strong>Dor e lesões</strong>
             <small>registrar dores, intensidade e acompanhar recuperação</small>
@@ -392,11 +313,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--spirit" onClick={() => goTo('vitals')}>
-          <span className="settings-mark">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <polyline points="4,16 8,10 12,20 16,8 20,18 24,12 28,16" />
-            </svg>
-          </span>
+          <Icon3D kind="vitals" size={42} />
           <span>
             <strong>Sinais vitais</strong>
             <small>FC repouso, HRV, passos · importar CSV do Garmin ou Apple Health</small>
@@ -404,7 +321,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--body" onClick={() => goTo('supplements')}>
-          <span className="settings-mark"><SettingsIcon kind="supplements" /></span>
+          <Icon3D kind="supplements" size={42} />
           <span>
             <strong>Suplementos e medicamentos</strong>
             <small>aderência diária, doses e horários de uso contínuo</small>
@@ -412,7 +329,7 @@ export function Profile() {
           <SettingsArrow />
         </button>
         <button className="settings-row settings-row--mind" onClick={() => goTo('labs')}>
-          <span className="settings-mark"><SettingsIcon kind="labs" /></span>
+          <Icon3D kind="labs" size={42} />
           <span>
             <strong>Exames laboratoriais</strong>
             <small>foto do laudo, IA extrai marcadores e rastreia tendências</small>
@@ -557,7 +474,7 @@ function PreferenceBlock<T extends string>({
       <span className="eyebrow">{eyebrow}</span>
       <h3 className="t-display-md">{title}</h3>
       <p className="t-body-sm muted">{hint}</p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+      <div className="chip-wrap" style={{ marginTop: 4 }}>
         {options.map((o) => (
           <button
             key={o.value}

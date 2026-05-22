@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { PresenceSlider } from '../components/PresenceSlider';
 import { cycleInfo } from '../lib/cycle';
-import { addDays, dateFromIso, diffMinutes, isoToday, lastDays, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
+import { addDays, dateFromIso, diffMinutes, formatDateLong, isoToday, lastDays, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
 import { useLocalState } from '../lib/useLocalState';
@@ -127,7 +127,6 @@ export function Energy() {
     setActiveCycleDate(selectedDate);
   }, [selectedDate]);
 
-  // Load 14 days of sleep history from Supabase
   useEffect(() => {
     if (!hasSupabase || !userId) return;
     const since = isoToday(addDays(new Date(), -13));
@@ -151,7 +150,6 @@ export function Energy() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  // Pre-populate form when selected date already has a sleep log
   useEffect(() => {
     sleepInitialized.current = false;
   }, [selectedDate]);
@@ -502,11 +500,7 @@ function SleepHistoryChart({ logs, selectedDate }: { logs: SleepLog[]; selectedD
 
 function formatDatePt(iso: string) {
   if (!iso) return 'selecionar';
-  return dateFromIso(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  return formatDateLong(iso);
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

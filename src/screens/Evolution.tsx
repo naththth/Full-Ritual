@@ -24,9 +24,6 @@ export function Evolution() {
       supabase.from('sleep_logs').select('*').gte('date', since).order('date', { ascending: true }),
       supabase.from('checkins').select('*').gte('date', since).order('date', { ascending: true }),
     ]).then(([scoreRes, sleepRes, checkinRes]) => {
-      if (scoreRes.error) console.error(scoreRes.error);
-      if (sleepRes.error) console.error(sleepRes.error);
-      if (checkinRes.error) console.error(checkinRes.error);
       setScores((scoreRes.data ?? []) as DailyScore[]);
       setSleepLogs((sleepRes.data ?? []) as SleepLog[]);
       setCheckins((checkinRes.data ?? []) as Checkin[]);

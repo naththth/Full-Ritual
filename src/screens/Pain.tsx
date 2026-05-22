@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { BackButton } from '../components/BackButton';
-import { isoToday } from '../lib/dates';
+import { Icon3DLarge } from '../components/Icon3D';
+import { formatDateShort, isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 
@@ -263,7 +264,7 @@ export function Pain() {
 
       {!loading && logs.length === 0 && !adding && (
         <div className="labs-empty">
-          <span className="labs-empty-glyph">○</span>
+          <Icon3DLarge kind="pain" size={64} className="labs-empty-glyph" />
           <p>Nenhuma dor registrada. Bom sinal! Registre quando precisar para rastrear padrões.</p>
         </div>
       )}
@@ -292,7 +293,7 @@ function PainCard({
         <div className="pain-card-info">
           <strong>{log.region}</strong>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <span className="t-body-sm muted">{formatDate(log.date)}</span>
+            <span className="t-body-sm muted">{formatDateShort(log.date)}</span>
             {typeInfo && (
               <span className="chip" style={{ fontSize: 10, padding: '2px 8px', color: typeInfo.color }}>
                 {typeInfo.label}
@@ -318,6 +319,3 @@ function PainCard({
   );
 }
 
-function formatDate(iso: string) {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-}

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Ring } from '../components/Ring';
 import { DIMENSION_COPY, getRoutineTasks } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
@@ -14,7 +15,7 @@ export function Dimension({ dim }: { dim: DimensionKey }) {
   const dateLabel = relativeDateLabel(selectedDate);
 
   return (
-    <div className="dimension-screen" style={{ '--dim': dimension.color } as React.CSSProperties}>
+    <div className="dimension-screen" style={{ '--dim': dimension.color } as CSSProperties}>
       <div className="dimension-hero">
         <button onClick={() => goTo('home')} aria-label="voltar" className="back-button">←</button>
         <span className="eyebrow">{dimension.label.toLowerCase()} · {dateLabel}</span>

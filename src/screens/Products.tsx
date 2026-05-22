@@ -72,7 +72,7 @@ export function Products() {
       return;
     }
 
-    supabase
+    void supabase
       .from('products')
       .select('*')
       .eq('user_id', userId)

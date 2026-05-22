@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
@@ -1281,7 +1281,7 @@ function FitAdjustmentsView({ adjustments }: { adjustments: import('../lib/train
   return (
     <div className="fit-adjustments">
       {/* Performance — visual de destaque */}
-      <div className="fit-adj-perf" style={{ '--adj-color': perf.color } as React.CSSProperties}>
+      <div className="fit-adj-perf" style={{ '--adj-color': perf.color } as CSSProperties}>
         <div className="fit-adj-perf-head">
           <span className="fit-adj-perf-icon">{perf.icon}</span>
           <div className="fit-adj-perf-labels">
@@ -1298,7 +1298,7 @@ function FitAdjustmentsView({ adjustments }: { adjustments: import('../lib/train
 
       {/* Análise cruzada */}
       {adjustments.context && verdict && (
-        <div className="fit-adj-context" style={{ '--adj-color': verdict.color } as React.CSSProperties}>
+        <div className="fit-adj-context" style={{ '--adj-color': verdict.color } as CSSProperties}>
           <div className="fit-adj-context-head">
             <span className="fit-adj-context-icon">{verdict.icon}</span>
             <span className="fit-adj-context-label">análise cruzada · {verdict.label}</span>
@@ -1460,7 +1460,7 @@ function TrainingSessionCard({
             <div
               key={group.key}
               className={`training-modality${isDone ? ' training-modality--done' : ''}`}
-              style={{ '--mod-color': color } as React.CSSProperties}
+              style={{ '--mod-color': color } as CSSProperties}
             >
               {group.label && (
                 <div className="training-modality-header">

@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { BackButton } from '../components/BackButton';
+import { Icon3DLarge } from '../components/Icon3D';
 import { isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
@@ -329,7 +330,7 @@ export function Supplements() {
 
       {!loading && supplements.length === 0 && !adding && (
         <div className="labs-empty">
-          <span className="labs-empty-glyph">◍</span>
+          <Icon3DLarge kind="supplements" size={64} className="labs-empty-glyph" />
           <p>Nenhum suplemento cadastrado ainda. Adicione vitaminas, suplementos e medicamentos de uso contínuo.</p>
         </div>
       )}

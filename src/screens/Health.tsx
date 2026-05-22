@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { BackButton } from '../components/BackButton';
-import { isoToday } from '../lib/dates';
+import { Icon3D, type Icon3DKind } from '../components/Icon3D';
+import { formatDateShort, isoToday } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 
@@ -30,7 +31,7 @@ const HEALTH_SECTIONS = [
     key: 'labs' as const,
     title: 'Exames laboratoriais',
     subtitle: 'foto do laudo → IA extrai marcadores',
-    glyph: '◐',
+    icon: 'labs' as Icon3DKind,
     color: 'var(--mind)',
     screen: 'labs' as const,
   },
@@ -38,7 +39,7 @@ const HEALTH_SECTIONS = [
     key: 'supplements' as const,
     title: 'Suplementos e medicamentos',
     subtitle: 'aderência diária e doses',
-    glyph: '◍',
+    icon: 'supplements' as Icon3DKind,
     color: 'var(--diet)',
     screen: 'supplements' as const,
   },
@@ -46,7 +47,7 @@ const HEALTH_SECTIONS = [
     key: 'vitals' as const,
     title: 'Sinais vitais',
     subtitle: 'FC, HRV, passos · importar Garmin',
-    glyph: '◑',
+    icon: 'vitals' as Icon3DKind,
     color: 'var(--body)',
     screen: 'vitals' as const,
   },
@@ -54,7 +55,7 @@ const HEALTH_SECTIONS = [
     key: 'pain' as const,
     title: 'Dor e lesões',
     subtitle: 'registrar, rastrear e resolver',
-    glyph: '○',
+    icon: 'pain' as Icon3DKind,
     color: 'var(--spirit)',
     screen: 'pain' as const,
   },
@@ -127,7 +128,7 @@ export function Health() {
         <section className="health-status-grid">
           <StatusCard
             label="exames"
-            value={summary.labs.lastDate ? formatShortDate(summary.labs.lastDate) : '—'}
+            value={summary.labs.lastDate ? formatDateShort(summary.labs.lastDate) : '—'}
             sub={summary.labs.abnormalCount > 0 ? `${summary.labs.abnormalCount} fora` : summary.labs.totalMarkers > 0 ? 'tudo ok' : 'sem dados'}
             color="var(--mind)"
             alert={summary.labs.abnormalCount > 0}
@@ -168,7 +169,7 @@ export function Health() {
             style={{ '--section-color': section.color } as CSSProperties}
             onClick={() => goTo(section.screen)}
           >
-            <span className="health-nav-glyph">{section.glyph}</span>
+            <Icon3D kind={section.icon} size={46} />
             <strong className="health-nav-title">{section.title}</strong>
             <span className="health-nav-sub">{section.subtitle}</span>
           </button>
@@ -213,6 +214,3 @@ function StatusCard({
   );
 }
 
-function formatShortDate(iso: string) {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-}

@@ -1,4 +1,5 @@
 import { supabase, hasSupabase } from './supabase';
+import { fileToBase64 } from './files';
 import type { BodyMetric, BodyAiAnalysis } from '../types';
 
 export async function listBodyMetrics(userId: string, limit = 60): Promise<BodyMetric[]> {
@@ -211,15 +212,3 @@ export function daysSince(dateIso: string | null | undefined): number | null {
   return Math.floor((Date.now() - new Date(dateIso).getTime()) / 86400000);
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const idx = result.indexOf('base64,');
-      resolve(idx >= 0 ? result.slice(idx + 7) : result);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}

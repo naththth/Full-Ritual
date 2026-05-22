@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useApp } from '../store/useStore';
 import { Glyph } from './Glyph';
 
@@ -43,7 +44,7 @@ export function TabBar() {
             onClick={() => goTo(tab.key)}
             aria-current={active ? 'page' : undefined}
             aria-label={tab.label}
-            style={active && tab.dim ? ({ ['--tab-accent' as never]: tab.dim } as React.CSSProperties) : undefined}
+            style={active && tab.dim ? ({ ['--tab-accent' as never]: tab.dim } as CSSProperties) : undefined}
           >
             <span className="tab__icon" aria-hidden style={tab.dim && active ? { color: tab.dim } : undefined}>
               <Glyph kind={tab.glyph} size={20} strokeWidth={1.7} filled={active} />

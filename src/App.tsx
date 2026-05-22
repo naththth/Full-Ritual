@@ -35,7 +35,6 @@ export default function App() {
   const toast = useApp((s) => s.toast);
   const autoSelectedDate = useRef(isoToday());
 
-  // Sessão Supabase
   useEffect(() => {
     if (!hasSupabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -120,19 +119,7 @@ export default function App() {
         </div>
         <TabBar />
         {toast && (
-          <div
-            style={{
-              position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-              bottom: 96, zIndex: 80,
-              maxWidth: 400, width: 'calc(100% - 40px)',
-              background: 'var(--chocolate)', color: 'var(--ivory)',
-              padding: '14px 18px', borderRadius: 20,
-              fontSize: 13, fontFamily: 'var(--sans)',
-              boxShadow: '0 18px 40px rgba(74,44,34,0.30)',
-            }}
-            role="status"
-            aria-live="polite"
-          >
+          <div className="app-toast" role="status" aria-live="polite">
             {toast}
           </div>
         )}

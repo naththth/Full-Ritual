@@ -54,6 +54,16 @@ export function minutesToSleepLabel(minutes: number | null | undefined) {
   return `${hours}h${String(mins).padStart(2, '0')}`;
 }
 
+export function formatDateLong(iso: string) {
+  return dateFromIso(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+}
+
+export function formatDateShort(iso: string) {
+  return dateFromIso(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
 export function diffMinutes(start: string, end: string) {
   if (!start || !end) return null;
   const [startH, startM] = start.split(':').map(Number);
