@@ -74,7 +74,19 @@ export const useApp = create<AppState>()(
     (set, get) => ({
       userId: null,
       profile: null,
-      setProfile: (profile) => set({ profile }),
+      setProfile: (profile) => {
+        const updates: Partial<AppState> = { profile };
+        if (profile) {
+          const dims = profile.selected_dimensions?.length
+            ? (profile.selected_dimensions as DimensionKey[]).filter((d): d is DimensionKey =>
+                ['skin', 'body', 'mind', 'diet', 'spirit'].includes(d),
+              )
+            : (['skin', 'body', 'mind', 'diet', 'spirit'] as DimensionKey[]);
+          updates.activeDimensions = dims;
+          updates.sexo = profile.biological_sex ?? null;
+        }
+        set(updates);
+      },
       setUser: (userId) => set((state) => {
         if (state.userId === userId) return { userId };
         return {

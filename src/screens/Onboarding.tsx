@@ -240,7 +240,7 @@ export function Onboarding() {
   const goTo = useApp((s) => s.goTo);
 
   // modo: 'setup' = primeiro onboarding, 'reconfig' = editar dimensões depois
-  const isReconfig = !!(profile?.skin_type || profile?.sport_modalities?.length);
+  const isReconfig = !!(profile?.onboarding_completed);
 
   // dados básicos
   const [name, setName] = useState(profile?.name ?? '');
@@ -334,10 +334,14 @@ export function Onboarding() {
       ...(trainingMods.includes('musculacao') && !sports.includes('forca') ? ['forca' as SportModality] : []),
     ];
 
+    const now = new Date().toISOString();
+    const selectedDims = dims.length > 0 ? dims : (['skin', 'body', 'mind', 'diet', 'spirit'] as DimensionKey[]);
+
     const profilePayload = {
       id: userId ?? 'local',
       name: name.trim() || 'voce',
       birthdate: birthdate || null,
+      biological_sex: sexo,
       skin_type: skinType,
       sport_modalities: sportsList,
       music_prefs: musicPrefs,
@@ -357,13 +361,16 @@ export function Onboarding() {
       goal_water_l: goalWaterL !== '' ? Number(goalWaterL) : 2.5,
       goal_meditation_min: goalMeditationMin !== '' ? Number(goalMeditationMin) : 10,
       goal_reading_pages: goalReadingPages !== '' ? Number(goalReadingPages) : 20,
+      selected_dimensions: selectedDims,
+      onboarding_completed: true,
+      onboarding_version: '2',
     };
 
     if (hasSupabase && userId) {
       // perfil principal
       const { data } = await supabase.from('profiles').upsert({
         ...profilePayload,
-        onboarding_completed_at: new Date().toISOString(),
+        onboarding_completed_at: now,
       }).select('*').single();
       if (data) setProfile(data);
 
@@ -414,9 +421,9 @@ export function Onboarding() {
     } else {
       setProfile({
         ...profilePayload,
-        onboarding_completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        onboarding_completed_at: now,
+        created_at: now,
+        updated_at: now,
       } as Parameters<typeof setProfile>[0]);
     }
 

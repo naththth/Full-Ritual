@@ -1,4 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('./supabase', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
+      update: () => ({ eq: async () => ({ error: null }) }),
+    }),
+  },
+  hasSupabase: true,
+}));
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

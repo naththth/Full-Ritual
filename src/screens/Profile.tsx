@@ -174,6 +174,10 @@ export function Profile() {
           goal_meditation_min: payload.goal_meditation_min,
           goal_reading_pages: payload.goal_reading_pages,
           onboarding_completed_at: current?.onboarding_completed_at ?? null,
+          onboarding_completed: current?.onboarding_completed ?? false,
+          onboarding_version: current?.onboarding_version ?? null,
+          biological_sex: current?.biological_sex ?? null,
+          selected_dimensions: current?.selected_dimensions ?? ['skin', 'body', 'mind', 'diet', 'spirit'],
           created_at: current?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
