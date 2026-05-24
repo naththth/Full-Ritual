@@ -4,9 +4,10 @@ import { searchBookSuggestions } from '../lib/bookSearch';
 import { geminiChat } from '../lib/gemini';
 import { relativeDateLabel } from '../lib/dates';
 import { bookCoverSrc, mergeReadingBooks, readingProgress } from '../lib/reading';
-import { useLocalState } from '../lib/useLocalState';
-import { hasSupabase, supabase } from '../lib/supabase';
-import { scopedStorageKey } from '../lib/storage';
+import { hasSupabase } from '../lib/supabase';
+import { writeJson, readJson, scopedStorageKey } from '../lib/storage';
+import { loadReadingBooks, saveReadingBook, saveReadingSession } from '../lib/readingService';
+import { saveMindLogs } from '../lib/mindService';
 import { useApp } from '../store/useStore';
 import type { ContentPref, MindLog, ReadingBook, ReadingSession } from '../types';
 
@@ -148,9 +149,11 @@ export function Mind() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
   const goTo = useApp((s) => s.goTo);
-  const [mind, setMind] = useLocalState<MindState>(scopedStorageKey(`full-ritual-mind-${selectedDate}`, userId), initialMind);
-  const [readingBooks, setReadingBooks] = useLocalState<ReadingBook[]>(scopedStorageKey('full-ritual-reading-books', userId), []);
-  const [, setReadingSessions] = useLocalState<ReadingSession[]>(scopedStorageKey('full-ritual-reading-sessions', userId), []);
+
+  const mindKey = scopedStorageKey(`full-ritual-mind-${selectedDate}`, userId ?? '');
+  const booksKey = scopedStorageKey('full-ritual-reading-books', userId ?? '');
+  const [mind, setMind] = useState<MindState>(() => readJson(mindKey, initialMind));
+  const [readingBooks, setReadingBooks] = useState<ReadingBook[]>(() => readJson(booksKey, []));
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const dateLabel = relativeDateLabel(selectedDate);
@@ -169,21 +172,27 @@ export function Mind() {
     [mind.selectedBookId, readingBooks],
   );
 
+  // Sync mind form state to localStorage cache
+  useEffect(() => {
+    writeJson(mindKey, mind);
+  }, [mindKey, mind]);
+
+  // Load reading books from Supabase (source of truth); fall back to localStorage cache
   useEffect(() => {
     if (!hasSupabase || !userId) return;
-    void supabase
-      .from('reading_books')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(error);
-          return;
+    loadReadingBooks(userId)
+      .then((data) => {
+        if (data.length) {
+          setReadingBooks((current) => {
+            const merged = mergeReadingBooks(current, data);
+            writeJson(booksKey, merged);
+            return merged;
+          });
         }
-        if (data?.length) setReadingBooks((current) => mergeReadingBooks(current, data as ReadingBook[]));
-      });
-  }, [setReadingBooks, userId]);
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   useEffect(() => {
     const missingCovers = readingBooks
@@ -340,14 +349,15 @@ export function Mind() {
       updated_at: now,
     };
 
-    setReadingBooks((current) =>
-      current.map((book) => (book.id === activeBook.id ? updatedBook : book))
-    );
-    setReadingSessions((current) => [session, ...current]);
+    setReadingBooks((current) => {
+      const next = current.map((book) => (book.id === activeBook.id ? updatedBook : book));
+      writeJson(booksKey, next);
+      return next;
+    });
 
     if (hasSupabase && userId) {
-      await supabase.from('reading_books').upsert({ ...updatedBook, user_id: userId }, { onConflict: 'user_id,id' });
-      await supabase.from('reading_sessions').insert({ ...session, user_id: userId });
+      await saveReadingBook(userId, updatedBook);
+      await saveReadingSession(userId, session);
     }
   };
 
@@ -384,10 +394,7 @@ export function Mind() {
           };
         });
 
-        const { error } = await supabase
-          .from('mind_logs')
-          .upsert(rows, { onConflict: 'user_id,date,type' });
-        if (error) throw error;
+        await saveMindLogs(rows);
       }
       showToast('mente guardada.');
     } catch (error) {

@@ -1,7 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon3D, type Icon3DKind } from '../components/Icon3D';
-import { useLocalState } from '../lib/useLocalState';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { generateTrainingPlanWithAi, uploadFitAndEvaluate } from '../lib/trainingApi';
 import { isoToday } from '../lib/dates';
@@ -1176,14 +1175,19 @@ function PlanView({ userId, profile, plan, selectedDate, saving, onEditProfile, 
   const activeWorkoutDate = viewingDate || selectedDate;
   const [fitUploading, setFitUploading] = useState(false);
   const [fitModality, setFitModality] = useState<TrainingModality>('pedal');
-  const [fitAnalysis, setFitAnalysis] = useLocalState<FitAnalysis | null>(
-    scopedStorageKey(`full-ritual-fit-analysis-${activeWorkoutDate}`, userId),
-    null,
-  );
-  const [blockChecks, setBlockChecks] = useLocalState<Record<string, boolean>>(
-    scopedStorageKey(`full-ritual-workout-blocks-${activeWorkoutDate}`, userId),
-    {},
-  );
+  const fitKey = scopedStorageKey(`full-ritual-fit-analysis-${activeWorkoutDate}`, userId ?? '');
+  const blocksKey = scopedStorageKey(`full-ritual-workout-blocks-${activeWorkoutDate}`, userId ?? '');
+  const [fitAnalysis, setFitAnalysisState] = useState<FitAnalysis | null>(() => readJson(fitKey, null));
+  const [blockChecks, setBlockChecksState] = useState<Record<string, boolean>>(() => readJson(blocksKey, {}));
+
+  const setFitAnalysis = (v: FitAnalysis | null) => { setFitAnalysisState(v); writeJson(fitKey, v); };
+  const setBlockChecks = (updater: ((prev: Record<string, boolean>) => Record<string, boolean>) | Record<string, boolean>) => {
+    setBlockChecksState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      writeJson(blocksKey, next);
+      return next;
+    });
+  };
 
   const toggleTraining = (dayIdx: number, groupKey: string) => {
     const key = `${dayIdx}:${groupKey}`;
@@ -1676,18 +1680,11 @@ function TrainingSessionCard({
 }
 
 function writeWorkoutSummary(date: string, done: number, total: number, userId: string | null) {
-  try {
-    localStorage.setItem(
-      scopedStorageKey(`full-ritual-workout-summary-${date}`, userId),
-      JSON.stringify({
-        done,
-        total,
-        updated_at: new Date().toISOString(),
-      }),
-    );
-  } catch {
-    // Local score sync is best-effort; the workout check itself still works.
-  }
+  writeJson(scopedStorageKey(`full-ritual-workout-summary-${date}`, userId ?? ''), {
+    done,
+    total,
+    updated_at: new Date().toISOString(),
+  });
 }
 
 function trainingSectionsFor(blocks: TrainingDay['blocks']) {
@@ -1815,7 +1812,7 @@ function LoadField({
   date: string;
 }) {
   const storageKey = `full-ritual-load-${date}-${exerciseKey(title)}`;
-  const [value, setValue] = useLocalState<string>(storageKey, '');
+  const [value, setValue] = useState<string>(() => readJson(storageKey, ''));
 
   useEffect(() => {
     if (!userId || value) return;

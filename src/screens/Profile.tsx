@@ -173,6 +173,7 @@ export function Profile() {
           goal_water_l: payload.goal_water_l,
           goal_meditation_min: payload.goal_meditation_min,
           goal_reading_pages: payload.goal_reading_pages,
+          onboarding_completed_at: current?.onboarding_completed_at ?? null,
           created_at: current?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });

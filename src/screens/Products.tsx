@@ -6,10 +6,10 @@ import {
   type RoutineArea,
 } from '../data/ritualContent';
 import { regenerateSkincareRoutine } from '../lib/gemini';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
 import { uploadImageOrPreview } from '../lib/uploads';
-import { useLocalState } from '../lib/useLocalState';
-import { hasSupabase, supabase } from '../lib/supabase';
+import { loadProducts, saveProduct as persistProduct, updateProduct } from '../lib/productsService';
+import { hasSupabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 import type { Product, ProductCategory, ProductFrequency, ProductStep } from '../types';
 
@@ -32,8 +32,8 @@ export function Products() {
   const userId = useApp((s) => s.userId);
   const selectedDate = useApp((s) => s.selectedDate);
   const showToast = useApp((s) => s.showToast);
-  const [localProducts, setLocalProducts] = useLocalState<Product[]>(scopedStorageKey('full-ritual-products', userId), []);
-  const [products, setProducts] = useState<Product[]>([]);
+  const productsKey = scopedStorageKey('full-ritual-products', userId ?? '');
+  const [products, setProducts] = useState<Product[]>(() => readJson(productsKey, []));
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
   const [draftMeta, setDraftMeta] = useState<ProductMeta>({ routineArea: 'face' });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function Products() {
   const [routineNotes, setRoutineNotes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const source = hasSupabase ? products : localProducts;
+  const source = products;
   const ordered = useMemo(
     () => [...source].filter((product) => product.active).sort((a, b) => a.order_in_routine - b.order_in_routine),
     [source]
@@ -55,20 +55,14 @@ export function Products() {
   }, [ordered]);
 
   useEffect(() => {
-    if (!hasSupabase || !userId) {
-      setProducts([]);
-      return;
-    }
-
-    void supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', userId)
-      .order('order_in_routine', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        setProducts((data ?? []) as Product[]);
-      });
+    if (!hasSupabase || !userId) return;
+    loadProducts(userId)
+      .then((data) => {
+        setProducts(data);
+        writeJson(productsKey, data);
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   const resetDraft = () => {
@@ -99,46 +93,42 @@ export function Products() {
     setLoading(true);
     try {
       const currentProduct = source.find((item) => item.id === editingId);
-      if (hasSupabase && userId) {
-        const payload = {
-          user_id: userId,
-          name: draft.name.trim(),
-          brand: draft.brand?.trim() || null,
-          category: draft.category,
-          step: draft.step,
-          frequency: draft.frequency,
-          notes: serializeProductNotes(draft.notes, draftMeta),
-          photo_url: draft.photo_url,
-          active: true,
-        };
+      const payload = {
+        name: draft.name.trim(),
+        brand: draft.brand?.trim() || null,
+        category: draft.category,
+        step: draft.step,
+        frequency: draft.frequency,
+        notes: serializeProductNotes(draft.notes, draftMeta),
+        photo_url: draft.photo_url,
+        active: true,
+      };
 
-        const query = editingId
-          ? supabase.from('products').update(payload).eq('id', editingId).eq('user_id', userId).select('*').single()
-          : supabase.from('products').insert(payload).select('*').single();
-        const { data, error } = await query;
-        if (error) throw error;
+      if (hasSupabase && userId) {
+        const saved = editingId
+          ? await updateProduct(userId, editingId, payload)
+          : await persistProduct(userId, { ...payload, order_in_routine: source.length + 1 });
         setProducts((current) => {
-          const next = current.filter((product) => product.id !== data.id);
-          return [...next, data as Product];
+          const next = [...current.filter((p) => p.id !== saved.id), saved];
+          writeJson(productsKey, next);
+          return next;
         });
       } else {
         const product: Product = {
           id: editingId ?? crypto.randomUUID(),
           user_id: userId ?? 'local',
-          name: draft.name.trim(),
-          brand: draft.brand?.trim() || null,
-          category: draft.category,
-          step: draft.step,
-          frequency: draft.frequency,
+          ...payload,
           order_in_routine: editingId
-            ? currentProduct?.order_in_routine ?? localProducts.length + 1
-            : localProducts.length + 1,
-          notes: serializeProductNotes(draft.notes, draftMeta),
+            ? currentProduct?.order_in_routine ?? source.length + 1
+            : source.length + 1,
           photo_url: draft.photo_url ?? currentProduct?.photo_url ?? null,
-          active: true,
           created_at: currentProduct?.created_at ?? new Date().toISOString(),
         };
-        setLocalProducts((current) => [...current.filter((item) => item.id !== product.id), product]);
+        setProducts((current) => {
+          const next = [...current.filter((p) => p.id !== product.id), product];
+          writeJson(productsKey, next);
+          return next;
+        });
       }
       resetDraft();
       showToast('produto salvo.');
@@ -171,15 +161,17 @@ export function Products() {
   };
 
   const removeProduct = async (product: Product) => {
-    if (hasSupabase && userId) {
-      const { error } = await supabase.from('products').update({ active: false }).eq('id', product.id).eq('user_id', userId);
-      if (error) {
-        showToast('não foi possível remover.');
-        return;
+    try {
+      if (hasSupabase && userId) {
+        await updateProduct(userId, product.id, { active: false });
       }
-      setProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: false } : item));
-    } else {
-      setLocalProducts((current) => current.map((item) => item.id === product.id ? { ...item, active: false } : item));
+      setProducts((current) => {
+        const next = current.map((item) => item.id === product.id ? { ...item, active: false } : item);
+        writeJson(productsKey, next);
+        return next;
+      });
+    } catch {
+      showToast('não foi possível remover.');
     }
   };
 
@@ -192,22 +184,16 @@ export function Products() {
         showToast('rotina regenerada.');
       } else {
         const order: Record<ProductCategory, number> = {
-          limpeza: 1,
-          tonico: 2,
-          esfoliante: 3,
-          serum: 4,
-          tratamento: 5,
-          olhos: 6,
-          hidratante: 7,
-          mascara: 8,
-          protetor_solar: 9,
-          corpo: 10,
+          limpeza: 1, tonico: 2, esfoliante: 3, serum: 4, tratamento: 5,
+          olhos: 6, hidratante: 7, mascara: 8, protetor_solar: 9, corpo: 10,
         };
-        setLocalProducts((current) =>
-          current
+        setProducts((current) => {
+          const next = current
             .map((product) => ({ ...product, order_in_routine: order[product.category] ?? 99 }))
-            .sort((a, b) => a.order_in_routine - b.order_in_routine)
-        );
+            .sort((a, b) => a.order_in_routine - b.order_in_routine);
+          writeJson(productsKey, next);
+          return next;
+        });
         setRoutineNotes(['Rotina local ordenada por categoria clínica.']);
       }
     } catch (error) {

@@ -126,7 +126,7 @@ export default function App() {
 
   // Perfil ainda carregando — aguarda antes de decidir onboarding
   const profileLoaded = profile !== null || !hasSupabase;
-  const needsOnboarding = profileLoaded && !profile?.skin_type && !profile?.sport_modalities?.length;
+  const needsOnboarding = profileLoaded && !profile?.onboarding_completed_at;
   const showOnboarding = needsOnboarding || screen === 'onboarding';
 
   return (

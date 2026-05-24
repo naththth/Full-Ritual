@@ -55,6 +55,11 @@ export interface Profile {
   goal_meditation_min: number | null;
   goal_reading_pages: number | null;
 
+  onboarding_completed_at: string | null;
+  onboarding_completed: boolean;
+  onboarding_version: string | null;
+  biological_sex: 'feminino' | 'masculino' | 'outro' | null;
+  selected_dimensions: string[];
   created_at: string;
   updated_at: string;
 }

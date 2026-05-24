@@ -3,9 +3,8 @@ import { PresenceSlider } from '../components/PresenceSlider';
 import { cycleInfo } from '../lib/cycle';
 import { addDays, dateFromIso, diffMinutes, formatDateLong, isoToday, lastDays, minutesToSleepLabel, relativeDateLabel } from '../lib/dates';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { scopedStorageKey } from '../lib/storage';
 import { useAutoSave } from '../lib/useAutoSave';
-import { useLocalState } from '../lib/useLocalState';
+import { useEnergyDay } from '../lib/useEnergyDay';
 import { useApp } from '../store/useStore';
 import type { CyclePhase, SleepLog } from '../types';
 
@@ -29,46 +28,15 @@ const PHASE_META: Record<CyclePhase, { label: string; short: string; color: stri
   lutea: { label: 'lútea', short: 'lut', color: 'var(--body)' },
 };
 
-type EnergyCheckin = {
-  energy: number;
-  calm: number;
-  skinState: number;
-  bodyState: number;
-  signals: string[];
-  note: string;
-};
+function numberOrFallback(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
 
 type CyclePrefs = {
   start: string;
   length: number;
   tracking: boolean;
 };
-
-function initialCheckin(): EnergyCheckin {
-  return {
-    energy: 6,
-    calm: 5,
-    skinState: 7,
-    bodyState: 6,
-    signals: [],
-    note: '',
-  };
-}
-
-function numberOrFallback(value: unknown, fallback: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function normalizeCheckin(value: EnergyCheckin): EnergyCheckin {
-  return {
-    energy: numberOrFallback(value.energy, 6),
-    calm: numberOrFallback(value.calm, 5),
-    skinState: numberOrFallback(value.skinState, 7),
-    bodyState: numberOrFallback(value.bodyState, 6),
-    signals: Array.isArray(value.signals) ? value.signals.filter((signal): signal is string => typeof signal === 'string') : [],
-    note: typeof value.note === 'string' ? value.note : '',
-  };
-}
 
 function normalizeCyclePrefs(value: CyclePrefs, fallbackDate: string): CyclePrefs {
   return {
@@ -86,29 +54,33 @@ export function Energy() {
   const showToast = useApp((s) => s.showToast);
   const sexo = useApp((s) => s.sexo);
 
-  const previousDate = isoToday(addDays(dateFromIso(selectedDate), -1));
-  const [rawCheckin, setCheckin] = useLocalState<EnergyCheckin>(scopedStorageKey(`full-ritual-energy-${selectedDate}`, userId), initialCheckin());
-  const [rawSleepLogs, setSleepLogs] = useLocalState<SleepLog[]>(scopedStorageKey('full-ritual-sleep', userId), []);
-  const [rawCyclePrefs, setCyclePrefs] = useLocalState<CyclePrefs>(scopedStorageKey('full-ritual-cycle', userId), {
+  const {
+    checkin,
+    setCheckinField,
+    toggleSignal,
+    sleepHistory,
+    currentSleep,
+    previousDate,
+    persistSleep,
+  } = useEnergyDay(userId, selectedDate);
+
+  const [cyclePrefs, setCyclePrefs] = useState<CyclePrefs>({
     start: profile?.cycle_start ?? selectedDate,
     length: profile?.cycle_length ?? 28,
     tracking: profile?.cycle_tracking ?? false,
   });
-  const checkin = normalizeCheckin(rawCheckin);
-  const sleepLogs = Array.isArray(rawSleepLogs) ? rawSleepLogs : [];
-  const cyclePrefs = normalizeCyclePrefs(rawCyclePrefs, selectedDate);
   const [bedtime, setBedtime] = useState('23:30');
   const [wakeTime, setWakeTime] = useState('06:40');
   const [sleepQuality, setSleepQuality] = useState(7);
   const [sleepNotes, setSleepNotes] = useState('');
   const [activeCycleDate, setActiveCycleDate] = useState(selectedDate);
-  const [sleepHistory, setSleepHistory] = useState<SleepLog[]>([]);
   const sleepInitialized = useRef(false);
 
   const duration = diffMinutes(bedtime, wakeTime);
   const dateLabel = relativeDateLabel(selectedDate);
-  const cycleStart = cyclePrefs.start || profile?.cycle_start || selectedDate;
-  const cycleLength = cyclePrefs.length || profile?.cycle_length || 28;
+  const normalizedCycle = normalizeCyclePrefs(cyclePrefs, selectedDate);
+  const cycleStart = normalizedCycle.start || profile?.cycle_start || selectedDate;
+  const cycleLength = normalizedCycle.length || profile?.cycle_length || 28;
   const cycle = useMemo(() => {
     const selected = dateFromIso(selectedDate);
     const day = selected.getDay();
@@ -123,34 +95,10 @@ export function Energy() {
   }, [cycleLength, cycleStart, selectedDate]);
   const todayCycle = cycle.find((day) => day.date === selectedDate) ?? cycle.find((day) => day.isToday);
   const activeCycle = cycle.find((day) => day.date === activeCycleDate) ?? todayCycle;
-  const currentSleep = sleepLogs.find((log) => log.date === selectedDate);
 
   useEffect(() => {
     setActiveCycleDate(selectedDate);
   }, [selectedDate]);
-
-  useEffect(() => {
-    if (!hasSupabase || !userId) return;
-    const since = isoToday(addDays(new Date(), -13));
-    supabase
-      .from('sleep_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('date', since)
-      .order('date', { ascending: true })
-      .then(({ data }) => {
-        if (!data) return;
-        setSleepHistory(data as SleepLog[]);
-        setSleepLogs((current) => {
-          const merged = [...current];
-          for (const log of data as SleepLog[]) {
-            if (!merged.some((l) => l.date === log.date)) merged.push(log);
-          }
-          return merged;
-        });
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
 
   useEffect(() => {
     sleepInitialized.current = false;
@@ -158,115 +106,34 @@ export function Energy() {
 
   useEffect(() => {
     if (sleepInitialized.current) return;
-    const existing = sleepHistory.find((l) => l.date === selectedDate) ?? currentSleep;
+    const existing = sleepHistory.find((l) => l.date === selectedDate);
     if (!existing) return;
     sleepInitialized.current = true;
     if (existing.bedtime) setBedtime(existing.bedtime.slice(11, 16));
     if (existing.wake_time) setWakeTime(existing.wake_time.slice(11, 16));
     if (existing.quality != null) setSleepQuality(existing.quality);
     if (existing.notes) setSleepNotes(existing.notes);
-  }, [sleepHistory, selectedDate, currentSleep]);
+  }, [sleepHistory, selectedDate]);
 
   useEffect(() => {
     const profileCycleStart = profile?.cycle_start;
     if (!profileCycleStart) return;
-    setCyclePrefs((current) => {
-      const next = {
-        start: profileCycleStart,
-        length: profile.cycle_length ?? 28,
-        tracking: profile.cycle_tracking,
-      };
-
-      if (
-        current.start === next.start &&
-        current.length === next.length &&
-        current.tracking === next.tracking
-      ) return current;
-
-      return next;
+    setCyclePrefs({
+      start: profileCycleStart,
+      length: profile.cycle_length ?? 28,
+      tracking: profile.cycle_tracking,
     });
   }, [profile?.cycle_length, profile?.cycle_start, profile?.cycle_tracking]);
 
-  const setCheckinField = <K extends keyof EnergyCheckin>(field: K, value: EnergyCheckin[K]) => {
-    setCheckin((current) => ({ ...normalizeCheckin(current), [field]: value }));
-  };
-
-  const toggleSignal = (signal: string) => {
-    setCheckin((current) => {
-      const normalized = normalizeCheckin(current);
-      return {
-        ...normalized,
-        signals: normalized.signals.includes(signal)
-          ? normalized.signals.filter((item) => item !== signal)
-          : [...normalized.signals, signal],
-      };
-    });
-  };
-
-  useAutoSave(rawCheckin, async () => {
-    if (!hasSupabase || !userId) return;
-    try {
-      const { error } = await supabase.from('checkins').upsert({
-        user_id: userId,
-        date: selectedDate,
-        energy: checkin.energy,
-        calm: checkin.calm,
-        skin_state: checkin.skinState,
-        body_state: checkin.bodyState,
-        signals: checkin.signals,
-        note: checkin.note || null,
-      }, { onConflict: 'user_id,date' });
-      if (error) throw error;
-    } catch (error) {
-      console.error(error);
-      showToast('não foi possível salvar a energia.');
-    }
-  });
-
-  useAutoSave(`${bedtime}|${wakeTime}|${sleepQuality}|${sleepNotes}`, async () => {
+  useAutoSave(`${bedtime}|${wakeTime}|${sleepQuality}|${sleepNotes}`, () => {
     if (!duration) return;
-
-    const log: SleepLog = {
-      id: currentSleep?.id ?? crypto.randomUUID(),
-      user_id: userId ?? 'local',
-      date: selectedDate,
-      bedtime: `${previousDate}T${bedtime}:00`,
-      wake_time: `${selectedDate}T${wakeTime}:00`,
-      duration_min: duration,
-      quality: sleepQuality,
-      notes: sleepNotes || null,
-    };
-
-    try {
-      if (hasSupabase && userId) {
-        const { data, error } = await supabase
-          .from('sleep_logs')
-          .upsert({
-            user_id: userId,
-            date: log.date,
-            bedtime: log.bedtime,
-            wake_time: log.wake_time,
-            duration_min: log.duration_min,
-            quality: log.quality,
-            notes: log.notes,
-          }, { onConflict: 'user_id,date' })
-          .select('*')
-          .single();
-        if (error) throw error;
-        setSleepLogs((current) => [...current.filter((item) => item.date !== selectedDate), data as SleepLog]);
-      } else {
-        setSleepLogs((current) => [...current.filter((item) => item.date !== selectedDate), log]);
-      }
-    } catch (error) {
-      console.error(error);
-      showToast('não foi possível salvar o sono.');
-    }
+    persistSleep({ bedtime, wake_time: wakeTime, duration_min: duration, quality: sleepQuality, notes: sleepNotes || null }, previousDate);
   });
 
-  useAutoSave(rawCyclePrefs, async () => {
+  useAutoSave(cyclePrefs, async () => {
     const nextPrefs = {
-      start: cyclePrefs.start || selectedDate,
-      length: Number(cyclePrefs.length) || 28,
+      start: normalizedCycle.start || selectedDate,
+      length: Number(normalizedCycle.length) || 28,
       tracking: true,
     };
 

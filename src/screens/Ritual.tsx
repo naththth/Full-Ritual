@@ -1,12 +1,12 @@
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { ROUTINES, getRoutineTasks, type RoutineArea, type RoutinePeriod } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useAutoSave } from '../lib/useAutoSave';
-import { useLocalState } from '../lib/useLocalState';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
+import { loadSkincareLog, saveSkincareLog } from '../lib/skincareService';
 import { useApp } from '../store/useStore';
-import { hasSupabase, supabase } from '../lib/supabase';
+import { hasSupabase } from '../lib/supabase';
 
 type RoutineChecks = Record<string, boolean>;
 
@@ -15,11 +15,39 @@ export function Ritual() {
   const userId = useApp((s) => s.userId);
   const selectedDate = useApp((s) => s.selectedDate);
 
+  const checksKey = scopedStorageKey(`full-ritual-routine-checks-${selectedDate}`, userId ?? '');
+  const photoKey = scopedStorageKey(`full-ritual-skin-photo-${selectedDate}`, userId ?? '');
   const [period, setPeriod] = useState<RoutinePeriod>('day');
   const [openAreas, setOpenAreas] = useState<Set<RoutineArea>>(new Set());
-  const [checks, setChecks] = useLocalState<RoutineChecks>(scopedStorageKey(`full-ritual-routine-checks-${selectedDate}`, userId), {});
-  const [skinPhoto, setSkinPhoto] = useLocalState<string | null>(scopedStorageKey(`full-ritual-skin-photo-${selectedDate}`, userId), null);
+  const [checks, setChecksState] = useState<RoutineChecks>(() => readJson(checksKey, {}));
+  const [skinPhoto, setSkinPhotoState] = useState<string | null>(() => readJson(photoKey, null));
   const [note, setNote] = useState('');
+
+  const setChecks = (updater: ((prev: RoutineChecks) => RoutineChecks) | RoutineChecks) => {
+    setChecksState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      writeJson(checksKey, next);
+      return next;
+    });
+  };
+
+  const setSkinPhoto = (photo: string | null) => {
+    setSkinPhotoState(photo);
+    writeJson(photoKey, photo);
+  };
+
+  // Load skincare log from Supabase on date change
+  useEffect(() => {
+    if (!hasSupabase || !userId) return;
+    const timeOfDay = period === 'day' ? 'manha' : 'noite';
+    loadSkincareLog(userId, selectedDate, timeOfDay)
+      .then((data) => {
+        if (data?.photo_url) setSkinPhotoState(data.photo_url);
+        if (data?.skin_signal) setNote(data.skin_signal);
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedDate, period]);
 
   const routine: Record<RoutineArea, ReturnType<typeof getRoutineTasks>> = {
     face: getRoutineTasks(period, 'face', selectedDate),
@@ -65,14 +93,11 @@ export function Ritual() {
     if (!hasSupabase || !userId) return;
     if (!skinPhoto && !note) return;
     try {
-      const { error } = await supabase.from('skincare_logs').upsert({
-        user_id: userId,
-        date: selectedDate,
+      await saveSkincareLog(userId, selectedDate, {
         time_of_day: period === 'day' ? 'manha' : 'noite',
         skin_signal: note || null,
         photo_url: skinPhoto,
-      }, { onConflict: 'user_id,date,time_of_day' });
-      if (error) throw error;
+      });
     } catch (error) {
       console.error(error);
       showToast('não foi possível guardar agora.');

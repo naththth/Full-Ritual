@@ -5,9 +5,9 @@ import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
 import { useAutoSave } from '../lib/useAutoSave';
-import { useLocalState } from '../lib/useLocalState';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
+import { saveMealLog, loadDietPlan, saveDietPlan } from '../lib/dietService';
 import { useApp } from '../store/useStore';
 import type { MealType, WorkoutMealPeriod } from '../types';
 
@@ -262,14 +262,10 @@ export function Diet() {
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
 
-  const [diet, setDiet] = useLocalState<DietState>(
-    scopedStorageKey(`full-ritual-diet-${selectedDate}`, userId),
-    initialDiet,
-  );
-  const [storedDietPlan, setDietPlan] = useLocalState<DietPlan>(
-    scopedStorageKey('full-ritual-diet-plan', userId),
-    initialPlan,
-  );
+  const dietKey = scopedStorageKey(`full-ritual-diet-${selectedDate}`, userId ?? '');
+  const planKey = scopedStorageKey('full-ritual-diet-plan', userId ?? '');
+  const [diet, setDiet] = useState<DietState>(() => readJson(dietKey, initialDiet));
+  const [storedDietPlan, setDietPlan] = useState<DietPlan>(() => readJson(planKey, initialPlan));
   const dietPlan: DietPlan = {
     ...initialPlan,
     ...storedDietPlan,
@@ -290,29 +286,33 @@ export function Diet() {
   const target = profile?.goal_water_l ?? 2.5;
   const totals = totalMacros(dietPlan.manualFoods);
 
-  // carregar diet_plans do Supabase
+  // Sync diet state to localStorage cache when it changes
+  useEffect(() => { writeJson(dietKey, diet); }, [dietKey, diet]);
+  useEffect(() => { writeJson(planKey, storedDietPlan); }, [planKey, storedDietPlan]);
+
+  // Load diet_plans from Supabase (source of truth)
   useEffect(() => {
     if (!hasSupabase || !userId) return;
     let alive = true;
-    void supabase
-      .from('diet_plans')
-      .select('manual_foods, pdf_url, pdf_name, notes, setup_mode, nutri_profile, nutri_configured')
-      .eq('user_id', userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!alive || error || !data) return;
-        setDietPlan({
+    loadDietPlan(userId)
+      .then((data) => {
+        if (!alive || !data) return;
+        const plan: DietPlan = {
           manualFoods: normalizeFoods(data.manual_foods),
           pdfUrl: data.pdf_url ?? null,
           pdfName: data.pdf_name ?? null,
           notes: data.notes ?? '',
-          setupMode: data.setup_mode ?? null,
+          setupMode: data.setup_mode as DietPlan['setupMode'],
           nutriProfile: normalizeNutriProfile(data.nutri_profile),
-          nutriConfigured: Boolean(data.nutri_configured),
-        });
-      });
+          nutriConfigured: data.nutri_configured,
+        };
+        setDietPlan(plan);
+        writeJson(planKey, plan);
+      })
+      .catch(console.error);
     return () => { alive = false; };
-  }, [setDietPlan, userId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // carregar ai_additions
   useEffect(() => {
@@ -469,12 +469,12 @@ export function Diet() {
         const items = meal.variants[state.variant] ?? meal.variants.principal;
         const checked = items.filter((_, i) => state.checks[i]).map((item) => item.title);
         if (!checked.length && !state.photoUrl) continue;
-        const { error } = await supabase.from('meal_logs').upsert({
-          user_id: userId, date: selectedDate, meal_type: meal.mealType,
-          ingredients: checked, photo_url: state.photoUrl ?? null,
+        await saveMealLog(userId, selectedDate, {
+          meal_type: meal.mealType,
+          ingredients: checked,
+          photo_url: state.photoUrl ?? null,
           notes: `${meal.title} · ${state.variant}`,
-        }, { onConflict: 'user_id,date,meal_type' });
-        if (error) throw error;
+        });
       }
     } catch { showToast('não foi possível salvar a dieta.'); }
   });
@@ -482,14 +482,15 @@ export function Diet() {
   useAutoSave(dietPlan, async () => {
     if (!hasSupabase || !userId) return;
     try {
-      const { error } = await supabase.from('diet_plans').upsert({
-        user_id: userId, manual_foods: dietPlan.manualFoods,
-        pdf_url: dietPlan.pdfUrl, pdf_name: dietPlan.pdfName,
-        notes: dietPlan.notes || null, setup_mode: dietPlan.setupMode,
-        nutri_profile: dietPlan.nutriProfile, nutri_configured: dietPlan.nutriConfigured,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-      if (error) throw error;
+      await saveDietPlan(userId, {
+        manual_foods: dietPlan.manualFoods,
+        pdf_url: dietPlan.pdfUrl,
+        pdf_name: dietPlan.pdfName,
+        notes: dietPlan.notes || null,
+        setup_mode: dietPlan.setupMode,
+        nutri_profile: dietPlan.nutriProfile as unknown as Record<string, unknown>,
+        nutri_configured: dietPlan.nutriConfigured,
+      });
     } catch { showToast('não foi possível salvar o plano de dieta.'); }
   });
 

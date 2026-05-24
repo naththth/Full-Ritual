@@ -259,9 +259,9 @@ export function Home() {
       while (count < 365) {
         const iso = isoToday(date);
         const hasActivity =
-          localStorage.getItem(scopedStorageKey(`full-ritual-energy-${iso}`, userId)) !== null ||
-          localStorage.getItem(scopedStorageKey(`full-ritual-spirit-${iso}`, userId)) !== null ||
-          localStorage.getItem(scopedStorageKey(`full-ritual-diet-${iso}`, userId)) !== null;
+          readLocal<null>(scopedStorageKey(`full-ritual-energy-${iso}`, userId), null) !== null ||
+          readLocal<null>(scopedStorageKey(`full-ritual-spirit-${iso}`, userId), null) !== null ||
+          readLocal<null>(scopedStorageKey(`full-ritual-diet-${iso}`, userId), null) !== null;
         if (!hasActivity) break;
         count++;
         date = addDays(date, -1);

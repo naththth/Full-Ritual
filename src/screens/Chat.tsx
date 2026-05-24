@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BackButton } from '../components/BackButton';
 import { geminiChat } from '../lib/gemini';
 import { isoToday } from '../lib/dates';
-import { useLocalState } from '../lib/useLocalState';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
+import { loadConversation, saveConversation } from '../lib/chatService';
+import { hasSupabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 
 interface ChatMessage {
@@ -25,9 +26,41 @@ const starterMessages: ChatMessage[] = [
 export function Chat() {
   const focusedDimension = useApp((s) => s.focusedDimension);
   const userId = useApp((s) => s.userId);
-  const [messages, setMessages] = useLocalState<ChatMessage[]>(scopedStorageKey('full-ritual-chat', userId), starterMessages);
+  const chatKey = scopedStorageKey('full-ritual-chat', userId ?? '');
+  const [messages, setMessagesState] = useState<ChatMessage[]>(() => readJson(chatKey, starterMessages));
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const setMessages = (updater: ((prev: ChatMessage[]) => ChatMessage[]) | ChatMessage[]) => {
+    setMessagesState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      writeJson(chatKey, next);
+
+      if (hasSupabase && userId) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => {
+          saveConversation(userId, next).catch(console.error);
+        }, 1200);
+      }
+
+      return next;
+    });
+  };
+
+  // Load conversation from Supabase on mount
+  useEffect(() => {
+    if (!hasSupabase || !userId) return;
+    loadConversation(userId)
+      .then((msgs) => {
+        if (msgs.length) {
+          setMessagesState(msgs);
+          writeJson(chatKey, msgs);
+        }
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const send = async () => {
     const text = draft.trim();

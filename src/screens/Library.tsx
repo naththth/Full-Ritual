@@ -10,9 +10,9 @@ import {
   readingProgress,
   readingStatusLabel,
 } from '../lib/reading';
-import { useLocalState } from '../lib/useLocalState';
-import { hasSupabase, supabase } from '../lib/supabase';
-import { scopedStorageKey } from '../lib/storage';
+import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
+import { loadReadingBooks, saveReadingBook, saveReadingSession } from '../lib/readingService';
+import { hasSupabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 import type { ReadingBook, ReadingSession, ReadingStatus } from '../types';
 
@@ -53,8 +53,10 @@ const FEELINGS = ['clara', 'curiosa', 'calma', 'dispersa', 'cansada', 'tocada'];
 export function Library() {
   const userId = useApp((s) => s.userId);
   const showToast = useApp((s) => s.showToast);
-  const [books, setBooks] = useLocalState<ReadingBook[]>(scopedStorageKey('full-ritual-reading-books', userId), []);
-  const [sessions, setSessions] = useLocalState<ReadingSession[]>(scopedStorageKey('full-ritual-reading-sessions', userId), []);
+  const booksKey = scopedStorageKey('full-ritual-reading-books', userId ?? '');
+  const sessionsKey = scopedStorageKey('full-ritual-reading-sessions', userId ?? '');
+  const [books, setBooks] = useState<ReadingBook[]>(() => readJson(booksKey, []));
+  const [sessions, setSessions] = useState<ReadingSession[]>(() => readJson(sessionsKey, []));
   const [filter, setFilter] = useState<ReadingStatus | 'all'>('reading');
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<BookDraft>(emptyBook);
@@ -66,19 +68,19 @@ export function Library() {
 
   useEffect(() => {
     if (!hasSupabase || !userId) return;
-    void supabase
-      .from('reading_books')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(error);
-          return;
+    loadReadingBooks(userId)
+      .then((data) => {
+        if (data.length) {
+          setBooks((current) => {
+            const merged = mergeReadingBooks(current, data);
+            writeJson(booksKey, merged);
+            return merged;
+          });
         }
-        if (data?.length) setBooks((current) => mergeReadingBooks(current, data as ReadingBook[]));
-      });
-  }, [setBooks, userId]);
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   useEffect(() => {
     const lookupText = `${draft.title} ${draft.author}`.trim();
@@ -135,7 +137,10 @@ export function Library() {
       const incoming = parseGoodreadsCsv(text);
       const next = mergeReadingBooks(books, incoming);
       setBooks(next);
-      await syncBooks(incoming, userId);
+      writeJson(booksKey, next);
+      if (hasSupabase && userId) {
+        for (const book of incoming) await saveReadingBook(userId, book).catch(console.error);
+      }
       showToast(`${incoming.length} livros importados.`);
     } catch (error) {
       console.error(error);
@@ -152,8 +157,12 @@ export function Library() {
     }
 
     const book = createManualBook(draft);
-    setBooks((current) => mergeReadingBooks(current, [book]));
-    await syncBooks([book], userId);
+    setBooks((current) => {
+      const next = mergeReadingBooks(current, [book]);
+      writeJson(booksKey, next);
+      return next;
+    });
+    if (hasSupabase && userId) await saveReadingBook(userId, book).catch(console.error);
     setDraft(emptyBook);
     setSelectedLookup('');
     showToast('livro adicionado.');
@@ -177,14 +186,16 @@ export function Library() {
   const updateBook = async (bookId: string, patch: Partial<ReadingBook>) => {
     const updatedAt = new Date().toISOString();
     let updatedBook: ReadingBook | null = null;
-    setBooks((current) =>
-      current.map((book) => {
+    setBooks((current) => {
+      const next = current.map((book) => {
         if (book.id !== bookId) return book;
         updatedBook = { ...book, ...patch, updated_at: updatedAt };
-        return updatedBook;
-      })
-    );
-    if (updatedBook) await syncBooks([updatedBook], userId);
+        return updatedBook as ReadingBook;
+      });
+      writeJson(booksKey, next);
+      return next;
+    });
+    if (updatedBook && hasSupabase && userId) await saveReadingBook(userId, updatedBook).catch(console.error);
   };
 
   const registerProgress = async (book: ReadingBook) => {
@@ -212,13 +223,17 @@ export function Library() {
       created_at: now,
     };
 
-    setSessions((current) => [session, ...current]);
+    setSessions((current) => {
+      const next = [session, ...current];
+      writeJson(sessionsKey, next);
+      return next;
+    });
     await updateBook(book.id, {
       current_page: safeEndPage,
       status: nextStatus,
       date_read: nextStatus === 'read' ? isoToday() : book.date_read,
     });
-    await syncSessions([session], userId);
+    if (hasSupabase && userId) await saveReadingSession(userId, session).catch(console.error);
     setProgressDrafts((current) => ({ ...current, [book.id]: defaultProgressDraft() }));
     showToast('leitura registrada.');
   };
@@ -459,16 +474,3 @@ function defaultProgressDraft(): ProgressDraft {
   };
 }
 
-async function syncBooks(books: ReadingBook[], userId: string | null) {
-  if (!hasSupabase || !userId || !books.length) return;
-  const rows = books.map((book) => ({ ...book, user_id: userId }));
-  const { error } = await supabase.from('reading_books').upsert(rows, { onConflict: 'user_id,id' });
-  if (error) console.error(error);
-}
-
-async function syncSessions(sessions: ReadingSession[], userId: string | null) {
-  if (!hasSupabase || !userId || !sessions.length) return;
-  const rows = sessions.map((session) => ({ ...session, user_id: userId }));
-  const { error } = await supabase.from('reading_sessions').insert(rows);
-  if (error) console.error(error);
-}

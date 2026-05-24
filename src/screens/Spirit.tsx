@@ -1,18 +1,7 @@
 import { relativeDateLabel } from '../lib/dates';
-import { useAutoSave } from '../lib/useAutoSave';
-import { useLocalState } from '../lib/useLocalState';
-import { hasSupabase, supabase } from '../lib/supabase';
-import { scopedStorageKey } from '../lib/storage';
+import { useSpiritDay } from '../lib/useSpiritDay';
 import { useApp } from '../store/useStore';
 import type { SpiritTheme } from '../types';
-
-interface SpiritState {
-  intention: string;
-  relief: string;
-  gratitude: string;
-  mood: number;
-  theme: SpiritTheme | null;
-}
 
 const THEMES: { value: SpiritTheme; label: string; mark: string }[] = [
   { value: 'presenca', label: 'presença', mark: '◌' },
@@ -23,43 +12,11 @@ const THEMES: { value: SpiritTheme; label: string; mark: string }[] = [
   { value: 'criatividade', label: 'criatividade', mark: '△' },
 ];
 
-const initialSpirit: SpiritState = {
-  intention: '',
-  relief: '',
-  gratitude: '',
-  mood: 7,
-  theme: 'presenca',
-};
-
 export function Spirit() {
   const userId = useApp((s) => s.userId);
-  const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
-  const [spirit, setSpirit] = useLocalState<SpiritState>(scopedStorageKey(`full-ritual-spirit-${selectedDate}`, userId), initialSpirit);
+  const { state: spirit, update } = useSpiritDay(userId, selectedDate);
   const dateLabel = relativeDateLabel(selectedDate);
-
-  const update = <K extends keyof SpiritState>(key: K, value: SpiritState[K]) => {
-    setSpirit((current) => ({ ...current, [key]: value }));
-  };
-
-  useAutoSave(spirit, async () => {
-    if (!hasSupabase || !userId) return;
-    try {
-      const { error } = await supabase.from('spirit_logs').upsert({
-        user_id: userId,
-        date: selectedDate,
-        intention: spirit.intention || null,
-        gratitude: spirit.gratitude ? [spirit.gratitude] : [],
-        mood: spirit.mood,
-        theme: spirit.theme,
-        notes: spirit.relief || null,
-      }, { onConflict: 'user_id,date' });
-      if (error) throw error;
-    } catch (error) {
-      console.error(error);
-      showToast('não foi possível salvar espírito.');
-    }
-  });
 
   return (
     <div className="screen stack-md spirit-screen">

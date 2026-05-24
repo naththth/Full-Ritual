@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { supabase, hasSupabase } from '../lib/supabase';
-import { scopedStorageKey, writeJson } from '../lib/storage';
 import { useApp } from '../store/useStore';
 import type {
   ContentPref, DimensionKey, MusicPref, SkinType, SportModality, SpiritTheme,
@@ -362,7 +361,10 @@ export function Onboarding() {
 
     if (hasSupabase && userId) {
       // perfil principal
-      const { data } = await supabase.from('profiles').upsert(profilePayload).select('*').single();
+      const { data } = await supabase.from('profiles').upsert({
+        ...profilePayload,
+        onboarding_completed_at: new Date().toISOString(),
+      }).select('*').single();
       if (data) setProfile(data);
 
       // training_profile se corpo foi selecionado
@@ -412,21 +414,10 @@ export function Onboarding() {
     } else {
       setProfile({
         ...profilePayload,
+        onboarding_completed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as Parameters<typeof setProfile>[0]);
-
-      if (dims.includes('diet') && dietSetupMode) {
-        writeJson(scopedStorageKey('full-ritual-diet-plan', userId), {
-          manualFoods: [],
-          pdfUrl: null,
-          pdfName: null,
-          notes: '',
-          setupMode: dietSetupMode,
-          nutriProfile: {},
-          nutriConfigured: false,
-        });
-      }
     }
 
     setSaving(false);
