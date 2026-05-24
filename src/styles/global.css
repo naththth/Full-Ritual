@@ -4593,6 +4593,98 @@ input[type="range"] {
   color: var(--diet);
 }
 
+/* ── Labs: PDF Viewer ────────────────────────────────────────────── */
+.labs-pdf-viewer {
+  height: 68vh;
+  min-height: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper-raised);
+  border: 1px solid var(--border);
+}
+.labs-pdf-viewer object {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.labs-pdf-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+/* ── Labs: Seções de marcadores (normal vs preocupante) ──────────── */
+.labs-markers-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 2px solid;
+}
+.labs-markers-section-header--alert {
+  border-color: var(--body);
+}
+.labs-markers-section-header--ok {
+  border-color: var(--diet);
+}
+.labs-disclaimer {
+  font-style: italic;
+  padding: 8px 0;
+}
+.chip--alert {
+  background: color-mix(in srgb, var(--body) 15%, var(--paper));
+  color: var(--body);
+}
+.chip--ok {
+  background: color-mix(in srgb, var(--diet) 15%, var(--paper));
+  color: var(--diet);
+}
+
+/* ── Labs: Entrada manual de marcador ───────────────────────────── */
+.labs-upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.labs-add-marker-form {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--paper-raised);
+}
+.labs-form-error {
+  color: var(--body);
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+.labs-marker-remove {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-faint);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.labs-marker-card {
+  position: relative;
+}
+
+/* ── Labs: Marcador status nao_classificado ──────────────────────── */
+.labs-marker-card--nao_classificado {
+  opacity: 0.75;
+}
+
+.row--gap-sm { gap: 8px; }
+
 /* ── Profile Goals ───────────────────────────────────────────────── */
 .profile-goals-grid {
   display: grid;

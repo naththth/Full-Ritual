@@ -1,13 +1,15 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Icon3DLarge } from '../components/Icon3D';
+import { PdfViewer } from '../components/PdfViewer';
 import { formatDateLong, isoToday } from '../lib/dates';
 import { fileToBase64 } from '../lib/files';
-import { uploadImageOrPreview } from '../lib/uploads';
+import { categorizeMarkers, fetchLabResults, saveLabResult, uploadLabFile } from '../lib/labService';
 import { hasSupabase, supabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
-import type { LabMarker, LabMarkerStatus, LabResult } from '../types';
+import type { LabFileType, LabMarker, LabMarkerStatus, LabResult } from '../types';
 
-// Marcadores conhecidos com referências femininas
+// ---------- Catálogo de marcadores conhecidos ----------
+
 const KNOWN_MARKERS: Record<string, { label: string; unit: string; ref_min?: number; ref_max?: number; note?: string }> = {
   ferritina:        { label: 'Ferritina',          unit: 'ng/mL',  ref_min: 20,  ref_max: 200,  note: 'reserva de ferro' },
   vitamina_d:       { label: 'Vitamina D',          unit: 'ng/mL',  ref_min: 30,  ref_max: 100,  note: 'deficiência <20' },
@@ -35,18 +37,22 @@ const KNOWN_MARKERS: Record<string, { label: string; unit: string; ref_min?: num
 };
 
 const STATUS_COLOR: Record<LabMarkerStatus, string> = {
-  normal:   'var(--diet)',
-  low:      'var(--mind)',
-  high:     'var(--body)',
-  critical: '#c0392b',
+  normal:           'var(--diet)',
+  low:              'var(--mind)',
+  high:             'var(--body)',
+  critical:         '#c0392b',
+  nao_classificado: 'var(--ink-faint)',
 };
 
 const STATUS_LABEL: Record<LabMarkerStatus, string> = {
-  normal:   'normal',
-  low:      'baixo',
-  high:     'alto',
-  critical: 'crítico',
+  normal:           'normal',
+  low:              'baixo',
+  high:             'alto',
+  critical:         'crítico',
+  nao_classificado: 'sem referência',
 };
+
+// ---------- Tela principal ----------
 
 export function Labs() {
   const userId = useApp((s) => s.userId);
@@ -58,44 +64,64 @@ export function Labs() {
   const [draftDate, setDraftDate] = useState(isoToday());
   const [draftLab, setDraftLab] = useState('');
   const [draftNotes, setDraftNotes] = useState('');
-  const [draftPhotoUrl, setDraftPhotoUrl] = useState<string | null>(null);
+  const [draftFileUrl, setDraftFileUrl] = useState<string | null>(null);
+  const [draftFileType, setDraftFileType] = useState<LabFileType>('photo');
   const [saving, setSaving] = useState(false);
   const [selectedResult, setSelectedResult] = useState<LabResult | null>(null);
+  const [showAddMarker, setShowAddMarker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!hasSupabase || !userId) { setLoading(false); return; }
-    supabase
-      .from('lab_results')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
-      .limit(20)
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        setResults((data ?? []) as LabResult[]);
-        setLoading(false);
-      });
+    fetchLabResults(userId)
+      .then((data) => setResults(data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, [userId]);
+
+  const handleFile = async (file: File) => {
+    if (!userId) {
+      showToast('faça login para enviar laudos.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      showToast('arquivo muito grande. máximo 20 MB.');
+      return;
+    }
+
+    const isPdf = file.type === 'application/pdf';
+
+    if (isPdf) {
+      await handlePdf(file);
+    } else {
+      await handlePhoto(file);
+    }
+  };
+
+  const handlePdf = async (file: File) => {
+    setAnalyzing(true);
+    try {
+      const url = await uploadLabFile(userId!, file);
+      setDraftFileUrl(url);
+      setDraftFileType('pdf');
+      setDraft({});
+      setShowAddMarker(true);
+    } catch (err) {
+      console.error(err);
+      showToast('não foi possível enviar o PDF.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const handlePhoto = async (file: File) => {
     if (!hasSupabase || !userId) {
       showToast('faça login para analisar laudos.');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('arquivo muito grande. máximo 10 MB.');
-      return;
-    }
     setAnalyzing(true);
     try {
-      const photoUrl = await uploadImageOrPreview({
-        bucket: 'labs',
-        userId,
-        file,
-        prefix: `lab-${isoToday()}`,
-      }).catch(() => null);
-
+      const photoUrl = await uploadLabFile(userId, file).catch(() => null);
       const base64 = await fileToBase64(file);
       const { data, error } = await supabase.functions.invoke('analyze-lab-photo', {
         body: {
@@ -111,7 +137,8 @@ export function Labs() {
       setDraft(data.markers ?? {});
       if (data.lab_name) setDraftLab(data.lab_name);
       if (data.date) setDraftDate(data.date);
-      if (photoUrl) setDraftPhotoUrl(photoUrl);
+      if (photoUrl) setDraftFileUrl(photoUrl);
+      setDraftFileType('photo');
       if (data.lab_result) setResults((prev) => [data.lab_result as LabResult, ...prev]);
     } catch (err) {
       console.error(err);
@@ -122,25 +149,23 @@ export function Labs() {
   };
 
   const saveDraft = async () => {
-    if (!draft || !userId || !hasSupabase) return;
+    if (draft === null || !userId || !hasSupabase) return;
     setSaving(true);
     try {
-      const { data, error } = await supabase
-        .from('lab_results')
-        .insert({
-          user_id: userId,
-          date: draftDate,
-          lab_name: draftLab || null,
-          photo_url: draftPhotoUrl,
-          markers: draft,
-          notes: draftNotes || null,
-        })
-        .select('*')
-        .single();
-      if (error) throw error;
-      setResults((prev) => [data as LabResult, ...prev.filter((r) => r.id !== data.id)]);
+      const saved = await saveLabResult({
+        user_id: userId,
+        date: draftDate,
+        lab_name: draftLab || null,
+        photo_url: draftFileUrl,
+        file_type: draftFileType,
+        markers: draft,
+        notes: draftNotes || null,
+      });
+      setResults((prev) => [saved, ...prev.filter((r) => r.id !== saved.id)]);
       setDraft(null);
+      setDraftFileUrl(null);
       setDraftNotes('');
+      setShowAddMarker(false);
       showToast('exame salvo.');
     } catch (err) {
       console.error(err);
@@ -151,7 +176,7 @@ export function Labs() {
   };
 
   const abnormalCount = (r: LabResult) =>
-    Object.values(r.markers).filter((m) => m.status !== 'normal').length;
+    Object.values(r.markers).filter((m) => m.status !== 'normal' && m.status !== 'nao_classificado').length;
 
   if (selectedResult) {
     return <LabDetail result={selectedResult} onBack={() => setSelectedResult(null)} />;
@@ -165,13 +190,13 @@ export function Labs() {
           O que seu <em className="t-display-italic">sangue conta.</em>
         </h1>
         <p className="t-body muted">
-          Foto do laudo e a IA extrai os marcadores automaticamente. Histórico com tendências.
+          Foto ou PDF do laudo. IA extrai marcadores automaticamente, ou adicione manualmente.
         </p>
       </header>
 
       {/* Upload card */}
       <section className="card stack labs-upload-card">
-        <span className="eyebrow">novo exame · IA extrai</span>
+        <span className="eyebrow">novo exame</span>
         <div className="labs-upload-grid">
           <label className="compact-field">
             <span>data do laudo</span>
@@ -191,37 +216,90 @@ export function Labs() {
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf"
           style={{ display: 'none' }}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) void handlePhoto(f); }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }}
         />
-        <button
-          className="btn btn--primary btn--full labs-photo-btn"
-          onClick={() => fileRef.current?.click()}
-          disabled={analyzing}
-          aria-busy={analyzing}
-        >
-          {analyzing ? (
-            <span className="labs-analyzing">
-              <span className="labs-spinner" />
-              analisando laudo...
-            </span>
-          ) : '+ enviar foto do laudo'}
-        </button>
+        <div className="labs-upload-actions">
+          <button
+            className="btn btn--primary btn--full labs-photo-btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={analyzing}
+            aria-busy={analyzing}
+          >
+            {analyzing ? (
+              <span className="labs-analyzing">
+                <span className="labs-spinner" />
+                {draftFileType === 'pdf' ? 'enviando PDF...' : 'analisando laudo...'}
+              </span>
+            ) : '+ foto ou PDF do laudo'}
+          </button>
+          <button
+            className="btn btn--secondary btn--sm"
+            onClick={() => { setDraft({}); setDraftFileType('manual'); setShowAddMarker(true); }}
+            disabled={analyzing}
+          >
+            + entrada manual
+          </button>
+        </div>
       </section>
 
-      {/* Draft review */}
-      {draft && Object.keys(draft).length > 0 && (
+      {/* Draft: PDF preview + marcadores + entrada manual */}
+      {draft !== null && (
         <section className="card stack">
           <div className="row-between">
-            <span className="eyebrow">marcadores extraídos</span>
-            <span className="chip">{Object.keys(draft).length} encontrados</span>
+            <span className="eyebrow">
+              {draftFileType === 'pdf' ? 'PDF enviado · adicione os marcadores' :
+               draftFileType === 'manual' ? 'entrada manual · adicione marcadores' :
+               'marcadores extraídos pela IA'}
+            </span>
+            {Object.keys(draft).length > 0 && (
+              <span className="chip">{Object.keys(draft).length} marcadores</span>
+            )}
           </div>
-          <div className="labs-markers-grid">
-            {Object.entries(draft).map(([key, marker]) => (
-              <MarkerCard key={key} markerKey={key} marker={marker} />
-            ))}
-          </div>
+
+          {/* PDF inline viewer */}
+          {draftFileType === 'pdf' && draftFileUrl && (
+            <PdfViewer url={draftFileUrl} title="Laudo enviado" />
+          )}
+
+          {/* Marcadores já adicionados */}
+          {Object.keys(draft).length > 0 && (
+            <div className="labs-markers-grid">
+              {Object.entries(draft).map(([key, marker]) => (
+                <MarkerCard
+                  key={key}
+                  markerKey={key}
+                  marker={marker}
+                  onRemove={() => setDraft((prev) => {
+                    if (!prev) return prev;
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                  })}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Formulário de adição de marcador */}
+          {showAddMarker ? (
+            <AddMarkerForm
+              onAdd={(key, marker) => {
+                setDraft((prev) => ({ ...(prev ?? {}), [key]: marker }));
+                setShowAddMarker(false);
+              }}
+              onCancel={() => setShowAddMarker(false)}
+            />
+          ) : (
+            <button
+              className="btn btn--secondary btn--sm"
+              onClick={() => setShowAddMarker(true)}
+            >
+              + adicionar marcador
+            </button>
+          )}
+
           <textarea
             className="field"
             rows={2}
@@ -229,23 +307,32 @@ export function Labs() {
             value={draftNotes}
             onChange={(e) => setDraftNotes(e.target.value)}
           />
-          <button className="btn btn--primary btn--full" onClick={() => void saveDraft()} disabled={saving}>
+          <button
+            className="btn btn--primary btn--full"
+            onClick={() => void saveDraft()}
+            disabled={saving}
+          >
             {saving ? 'salvando...' : 'confirmar e salvar exame'}
           </button>
-          <button className="btn btn--secondary btn--sm" onClick={() => setDraft(null)}>
+          <button className="btn btn--secondary btn--sm" onClick={() => {
+            setDraft(null);
+            setDraftFileUrl(null);
+            setShowAddMarker(false);
+          }}>
             descartar
           </button>
         </section>
       )}
 
-      {/* History */}
-      {!loading && results.length === 0 && !draft && (
+      {/* Estado vazio */}
+      {!loading && results.length === 0 && draft === null && (
         <div className="labs-empty">
           <Icon3DLarge kind="labs" size={64} className="labs-empty-glyph" />
-          <p>Nenhum exame ainda. Envie a foto de um laudo para começar.</p>
+          <p>Nenhum exame ainda. Envie a foto ou PDF de um laudo para começar.</p>
         </div>
       )}
 
+      {/* Histórico */}
       {results.length > 0 && (
         <section className="stack">
           <span className="eyebrow">histórico de exames</span>
@@ -259,7 +346,10 @@ export function Labs() {
               >
                 <div className="labs-result-info">
                   <strong>{formatDateLong(result.date)}</strong>
-                  <span className="t-body-sm muted">{result.lab_name ?? 'laboratório'} · {Object.keys(result.markers).length} marcadores</span>
+                  <span className="t-body-sm muted">
+                    {result.lab_name ?? 'laboratório'} · {Object.keys(result.markers).length} marcadores
+                    {result.file_type === 'pdf' && ' · PDF'}
+                  </span>
                 </div>
                 {abn > 0 ? (
                   <span className="labs-badge labs-badge--alert">{abn} fora</span>
@@ -272,13 +362,17 @@ export function Labs() {
         </section>
       )}
 
-      {/* Trends */}
       {results.length >= 2 && <LabTrends results={results} />}
     </div>
   );
 }
 
+// ---------- Detalhe do exame ----------
+
 function LabDetail({ result, onBack }: { result: LabResult; onBack: () => void }) {
+  const { normal, concerning } = categorizeMarkers(result.markers);
+  const hasBoth = Object.keys(concerning).length > 0 && Object.keys(normal).length > 0;
+
   return (
     <div className="screen stack-md">
       <header className="screen-header stack">
@@ -289,14 +383,59 @@ function LabDetail({ result, onBack }: { result: LabResult; onBack: () => void }
         </h1>
       </header>
 
-      <section className="card stack">
-        <span className="eyebrow">marcadores</span>
-        <div className="labs-markers-grid">
-          {Object.entries(result.markers).map(([key, marker]) => (
-            <MarkerCard key={key} markerKey={key} marker={marker} showRef />
-          ))}
+      {/* PDF ou foto do laudo */}
+      {result.photo_url && (
+        <section className="card stack">
+          <span className="eyebrow">laudo original</span>
+          {result.file_type === 'pdf' ? (
+            <PdfViewer url={result.photo_url} title={result.lab_name ?? 'Laudo'} />
+          ) : (
+            <img src={result.photo_url} alt="Laudo original" style={{ borderRadius: 12, width: '100%' }} />
+          )}
+        </section>
+      )}
+
+      {/* Marcadores fora da referência */}
+      {Object.keys(concerning).length > 0 && (
+        <section className="card stack">
+          <div className="labs-markers-section-header labs-markers-section-header--alert">
+            <span className="eyebrow">fora da faixa de referência informada no exame</span>
+            <span className="chip chip--alert">{Object.keys(concerning).length}</span>
+          </div>
+          <p className="t-body-sm muted labs-disclaimer">
+            Os valores abaixo estão fora da faixa indicada no laudo. Esses dados são de referência informativa — consulte seu médico para interpretação clínica.
+          </p>
+          <div className="labs-markers-grid">
+            {Object.entries(concerning).map(([key, marker]) => (
+              <MarkerCard key={key} markerKey={key} marker={marker} showRef />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Marcadores dentro da referência */}
+      {Object.keys(normal).length > 0 && (
+        <section className="card stack">
+          {hasBoth && (
+            <div className="labs-markers-section-header labs-markers-section-header--ok">
+              <span className="eyebrow">dentro da faixa de referência</span>
+              <span className="chip chip--ok">{Object.keys(normal).length}</span>
+            </div>
+          )}
+          {!hasBoth && <span className="eyebrow">marcadores</span>}
+          <div className="labs-markers-grid">
+            {Object.entries(normal).map(([key, marker]) => (
+              <MarkerCard key={key} markerKey={key} marker={marker} showRef />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {Object.keys(result.markers).length === 0 && (
+        <div className="labs-empty">
+          <p className="muted">Nenhum marcador registrado neste exame.</p>
         </div>
-      </section>
+      )}
 
       {result.notes && (
         <section className="card stack">
@@ -304,18 +443,23 @@ function LabDetail({ result, onBack }: { result: LabResult; onBack: () => void }
           <p className="t-body">{result.notes}</p>
         </section>
       )}
-
-      {result.photo_url && (
-        <section className="card stack">
-          <span className="eyebrow">laudo original</span>
-          <img src={result.photo_url} alt="Laudo original" style={{ borderRadius: 12, width: '100%' }} />
-        </section>
-      )}
     </div>
   );
 }
 
-function MarkerCard({ markerKey, marker, showRef = false }: { markerKey: string; marker: LabMarker; showRef?: boolean }) {
+// ---------- Card de marcador ----------
+
+function MarkerCard({
+  markerKey,
+  marker,
+  showRef = false,
+  onRemove,
+}: {
+  markerKey: string;
+  marker: LabMarker;
+  showRef?: boolean;
+  onRemove?: () => void;
+}) {
   const known = KNOWN_MARKERS[markerKey];
   const label = known?.label ?? markerKey.replace(/_/g, ' ');
   const color = STATUS_COLOR[marker.status];
@@ -327,6 +471,11 @@ function MarkerCard({ markerKey, marker, showRef = false }: { markerKey: string;
       className={`labs-marker-card labs-marker-card--${marker.status}`}
       style={{ '--marker-color': color } as CSSProperties}
     >
+      {onRemove && (
+        <button className="labs-marker-remove" onClick={onRemove} aria-label={`Remover ${label}`}>
+          ×
+        </button>
+      )}
       <span className="labs-marker-label">{label}</span>
       <div className="labs-marker-value">
         <strong>{marker.value}</strong>
@@ -338,10 +487,127 @@ function MarkerCard({ markerKey, marker, showRef = false }: { markerKey: string;
           ref: {refMin != null ? refMin : '?'} – {refMax != null ? refMax : '?'} {marker.unit}
         </span>
       )}
-      {known?.note && <span className="labs-marker-note">{known.note}</span>}
+      {marker.observacao && <span className="labs-marker-note">{marker.observacao}</span>}
+      {!marker.observacao && known?.note && <span className="labs-marker-note">{known.note}</span>}
     </div>
   );
 }
+
+// ---------- Formulário de adição manual de marcador ----------
+
+const EMPTY_FORM = {
+  key: '',
+  value: '',
+  unit: '',
+  ref_min: '',
+  ref_max: '',
+  status: 'normal' as LabMarkerStatus,
+  observacao: '',
+};
+
+function AddMarkerForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (key: string, marker: LabMarker) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [error, setError] = useState('');
+
+  const field = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const submit = () => {
+    const key = form.key.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!key) { setError('Nome do marcador obrigatório.'); return; }
+    const value = parseFloat(form.value);
+    if (isNaN(value)) { setError('Valor deve ser numérico.'); return; }
+    if (!form.unit.trim()) { setError('Unidade obrigatória.'); return; }
+
+    const marker: LabMarker = {
+      value,
+      unit: form.unit.trim(),
+      ref_min: form.ref_min ? parseFloat(form.ref_min) : null,
+      ref_max: form.ref_max ? parseFloat(form.ref_max) : null,
+      status: form.status,
+      observacao: form.observacao.trim() || null,
+    };
+    onAdd(key, marker);
+    setForm(EMPTY_FORM);
+    setError('');
+  };
+
+  return (
+    <div className="labs-add-marker-form card--inset stack">
+      <span className="eyebrow">novo marcador</span>
+      {error && <p className="labs-form-error">{error}</p>}
+      <div className="labs-upload-grid">
+        <label className="compact-field">
+          <span>nome do marcador *</span>
+          <input
+            type="text"
+            placeholder="ex: ferritina, TSH..."
+            value={form.key}
+            onChange={field('key')}
+          />
+        </label>
+        <label className="compact-field">
+          <span>unidade *</span>
+          <input
+            type="text"
+            placeholder="ex: ng/mL, %..."
+            value={form.unit}
+            onChange={field('unit')}
+          />
+        </label>
+        <label className="compact-field">
+          <span>valor *</span>
+          <input
+            type="number"
+            step="any"
+            placeholder="ex: 45.2"
+            value={form.value}
+            onChange={field('value')}
+          />
+        </label>
+        <label className="compact-field">
+          <span>status</span>
+          <select value={form.status} onChange={field('status')}>
+            <option value="normal">normal</option>
+            <option value="low">baixo</option>
+            <option value="high">alto</option>
+            <option value="critical">crítico</option>
+            <option value="nao_classificado">sem referência</option>
+          </select>
+        </label>
+        <label className="compact-field">
+          <span>ref. mínima</span>
+          <input type="number" step="any" placeholder="opcional" value={form.ref_min} onChange={field('ref_min')} />
+        </label>
+        <label className="compact-field">
+          <span>ref. máxima</span>
+          <input type="number" step="any" placeholder="opcional" value={form.ref_max} onChange={field('ref_max')} />
+        </label>
+      </div>
+      <label className="compact-field">
+        <span>observação</span>
+        <input
+          type="text"
+          placeholder="ex: colhido em jejum, matinal..."
+          value={form.observacao}
+          onChange={field('observacao')}
+        />
+      </label>
+      <div className="row row--gap-sm">
+        <button className="btn btn--primary btn--sm" onClick={submit}>adicionar</button>
+        <button className="btn btn--secondary btn--sm" onClick={onCancel}>cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Tendências ----------
 
 function LabTrends({ results }: { results: LabResult[] }) {
   const sorted = [...results].sort((a, b) => a.date.localeCompare(b.date));

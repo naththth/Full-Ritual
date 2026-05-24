@@ -373,7 +373,7 @@ export interface Insight {
 }
 
 // ---------- EXAMES LABORATORIAIS ----------
-export type LabMarkerStatus = 'normal' | 'low' | 'high' | 'critical';
+export type LabMarkerStatus = 'normal' | 'low' | 'high' | 'critical' | 'nao_classificado';
 
 export interface LabMarker {
   value: number;
@@ -381,7 +381,10 @@ export interface LabMarker {
   ref_min?: number | null;
   ref_max?: number | null;
   status: LabMarkerStatus;
+  observacao?: string | null;
 }
+
+export type LabFileType = 'photo' | 'pdf' | 'manual';
 
 export interface LabResult {
   id: string;
@@ -389,9 +392,23 @@ export interface LabResult {
   date: string;
   lab_name: string | null;
   photo_url: string | null;
+  file_type: LabFileType;
   markers: Record<string, LabMarker>;
   notes: string | null;
   created_at: string;
+}
+
+export interface LabSummary {
+  lastDate: string | null;
+  normalCount: number;
+  concerningCount: number;
+  concerning: Array<{
+    key: string;
+    name: string;
+    status: LabMarkerStatus;
+    value: number;
+    unit: string;
+  }>;
 }
 
 // ---------- SCORES DIÁRIOS (view materializada) ----------
