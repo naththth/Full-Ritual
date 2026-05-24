@@ -29,6 +29,24 @@ export function shouldShowCycleTracking(
   return profile.biological_sex === 'feminino' && profile.cycle_tracking === true;
 }
 
+export function toggleDimension(
+  current: DimensionKey[],
+  dim: DimensionKey,
+): DimensionKey[] {
+  const has = current.includes(dim);
+  if (has) {
+    const next = current.filter((d) => d !== dim);
+    return next.length === 0 ? current : next;
+  }
+  return [...current, dim];
+}
+
+export function normalizeDimensions(dims: string[]): DimensionKey[] {
+  const valid = SELECTABLE_DIMENSIONS;
+  const filtered = dims.filter((d): d is DimensionKey => (valid as readonly string[]).includes(d));
+  return filtered.length === 0 ? [...valid] : filtered;
+}
+
 export function buildProfilePatch(
   fields: Partial<Pick<Profile, 'biological_sex' | 'selected_dimensions' | 'onboarding_completed' | 'onboarding_completed_at' | 'onboarding_version'>>,
 ): typeof fields {

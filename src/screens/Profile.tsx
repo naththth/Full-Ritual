@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../store/useStore';
 import { supabase, hasSupabase } from '../lib/supabase';
 import { useAutoSave } from '../lib/useAutoSave';
+import { toggleDimension, SELECTABLE_DIMENSIONS } from '../lib/profileService';
+import { DIMENSIONS } from '../types';
 import type {
   Profile as ProfileData, SkinType, SportModality, MusicPref, ContentPref, SpiritTheme,
+  DimensionKey,
 } from '../types';
 
 const SKIN_TYPES: { value: SkinType; label: string }[] = [
@@ -84,6 +87,9 @@ export function Profile() {
   const [goalWaterL, setGoalWaterL] = useState(profile?.goal_water_l ?? 2.5);
   const [goalMeditationMin, setGoalMeditationMin] = useState(profile?.goal_meditation_min ?? 10);
   const [goalReadingPages, setGoalReadingPages] = useState(profile?.goal_reading_pages ?? 20);
+  const [dimensions, setDimensions] = useState<DimensionKey[]>(
+    activeDimensions.length ? activeDimensions : [...SELECTABLE_DIMENSIONS],
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -117,6 +123,25 @@ export function Profile() {
     }
     const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.path);
     setPhotoUrl(pub.publicUrl);
+  };
+
+  const handleToggleDimension = async (dim: DimensionKey) => {
+    const next = toggleDimension(dimensions, dim);
+    setDimensions(next);
+    useApp.getState().setActiveDimensions(next);
+    if (hasSupabase && userId) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ selected_dimensions: next, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) {
+        showToast('não foi possível salvar as dimensões.');
+        return;
+      }
+      if (profile) {
+        setProfile({ ...profile, selected_dimensions: next });
+      }
+    }
   };
 
   const saveKey = JSON.stringify({
@@ -375,6 +400,31 @@ export function Profile() {
           </div>
         </section>
       )}
+
+      <section className="card stack">
+        <span className="eyebrow">dimensões ativas</span>
+        <p className="t-body-sm muted">
+          As dimensões marcadas aparecem no menu e nos registros diários. Energia é sempre visível.
+        </p>
+        <div className="chip-wrap" style={{ marginTop: 8 }}>
+          <button className="chip chip--locked" disabled aria-pressed aria-label="Energia sempre ativa">
+            Energia
+          </button>
+          {SELECTABLE_DIMENSIONS.map((dim) => {
+            const active = dimensions.includes(dim);
+            return (
+              <button
+                key={dim}
+                className={`chip ${active ? 'chip--active' : ''}`}
+                onClick={() => void handleToggleDimension(dim)}
+                aria-pressed={active}
+              >
+                {DIMENSIONS[dim].label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <button className="btn btn--primary btn--full" onClick={() => void saveProfile()} disabled={saving}>
         {saving ? 'salvando...' : 'salvar alterações'}

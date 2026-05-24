@@ -22,7 +22,6 @@ type DimensionItem = {
 
 const profileMenuItems: MenuItem[] = [
   { label: 'Meu perfil', screen: 'profile', icon: 'health' },
-  { label: 'Configurar dimensões', screen: 'onboarding', icon: 'home' },
   { label: 'Biblioteca', screen: 'library', icon: 'library', requiredDimension: 'mind' },
   { label: 'Produtos', screen: 'products', icon: 'skincare', requiredDimension: 'skin' },
 ];

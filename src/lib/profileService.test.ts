@@ -59,6 +59,8 @@ import {
   getSelectableDimensions,
   shouldShowCycleTracking,
   buildProfilePatch,
+  toggleDimension,
+  normalizeDimensions,
 } from './profileService';
 
 // ─── testes ─────────────────────────────────────────────────────────────────
@@ -114,5 +116,68 @@ describe('profileService', () => {
     expect(dims).toEqual(VALID_DIMENSIONS);
     expect(dims).not.toContain('energy');
     expect(dims).not.toContain('insight');
+  });
+});
+
+describe('toggleDimension — pós-onboarding', () => {
+  // 1. Usuário consegue ativar dimensão depois do onboarding
+  it('ativa uma dimensão que estava inativa', () => {
+    const current = ['skin', 'body'] as const;
+    const result = toggleDimension([...current], 'mind');
+    expect(result).toContain('mind');
+    expect(result).toContain('skin');
+    expect(result).toContain('body');
+  });
+
+  // 2. Usuário consegue desativar dimensão opcional
+  it('desativa uma dimensão que estava ativa', () => {
+    const current = ['skin', 'body', 'mind'] as const;
+    const result = toggleDimension([...current], 'mind');
+    expect(result).not.toContain('mind');
+    expect(result).toContain('skin');
+    expect(result).toContain('body');
+  });
+
+  // 3. Energia nunca aparece nas dimensões selecionáveis
+  it('energy não faz parte das dimensões selecionáveis (não é DimensionKey)', () => {
+    const dims = getSelectableDimensions();
+    expect(dims).not.toContain('energy');
+  });
+
+  // 4. Insights nunca é tratado como dimensão
+  it('insight não aparece nas dimensões selecionáveis', () => {
+    const dims = getSelectableDimensions();
+    expect(dims).not.toContain('insight');
+  });
+
+  // 5. Alteração persiste corretamente via buildProfilePatch
+  it('alteração de dimensão serializa corretamente para o banco', () => {
+    const after = toggleDimension(['skin', 'body', 'mind', 'diet', 'spirit'], 'diet');
+    const patch = buildProfilePatch({ selected_dimensions: after });
+    expect(patch.selected_dimensions).toEqual(['skin', 'body', 'mind', 'spirit']);
+    expect(patch.selected_dimensions).not.toContain('diet');
+  });
+
+  // Não pode desativar a última dimensão (mínimo 1 ativa)
+  it('não desativa a única dimensão restante', () => {
+    const result = toggleDimension(['skin'], 'skin');
+    expect(result).toContain('skin');
+    expect(result).toHaveLength(1);
+  });
+});
+
+describe('normalizeDimensions', () => {
+  it('filtra valores inválidos e mantém apenas DimensionKey válidas', () => {
+    const raw = ['skin', 'energy', 'insight', 'body', 'unknown'];
+    const result = normalizeDimensions(raw);
+    expect(result).toEqual(['skin', 'body']);
+    expect(result).not.toContain('energy');
+    expect(result).not.toContain('insight');
+    expect(result).not.toContain('unknown');
+  });
+
+  it('retorna todas as 5 dimensões quando array vazio é passado', () => {
+    const result = normalizeDimensions([]);
+    expect(result).toEqual(['skin', 'body', 'mind', 'diet', 'spirit']);
   });
 });
