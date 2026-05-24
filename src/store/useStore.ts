@@ -25,7 +25,8 @@ export type Screen =
   | 'labs'
   | 'supplements'
   | 'pain'
-  | 'health';
+  | 'health'
+  | 'skin';
 
 interface NavigationEntry {
   screen: Screen;
@@ -60,7 +61,7 @@ interface AppState {
 function resolveScreen(screen: Screen, focusedDimension?: DimensionKey): NavigationEntry {
   if (screen !== 'dimension') return { screen, focusedDimension };
 
-  if (focusedDimension === 'skin') return { screen: 'ritual', focusedDimension };
+  if (focusedDimension === 'skin') return { screen: 'skin', focusedDimension };
   if (focusedDimension === 'body') return { screen: 'body', focusedDimension };
   if (focusedDimension === 'mind') return { screen: 'mind', focusedDimension };
   if (focusedDimension === 'diet') return { screen: 'diet', focusedDimension };

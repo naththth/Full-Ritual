@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Home } from './screens/Home';
+import { Skin } from './screens/Skin';
 import { Energy } from './screens/Energy';
 import { Ritual } from './screens/Ritual';
 import { Body } from './screens/Body';
@@ -138,6 +139,7 @@ export default function App() {
         <div className="scroll" ref={scrollRef}>
           {screen === 'home' && <Home />}
           {screen === 'energy' && <Energy />}
+          {screen === 'skin' && <Skin />}
           {screen === 'ritual' && <Ritual />}
           {screen === 'body' && <Body />}
           {screen === 'mind' && <Mind />}
@@ -155,7 +157,7 @@ export default function App() {
           {screen === 'supplements' && <Supplements />}
           {screen === 'pain' && <Pain />}
           {screen === 'health' && <Health />}
-          {screen === 'dimension' && focusedDimension === 'skin' && <Ritual />}
+          {screen === 'dimension' && focusedDimension === 'skin' && <Skin />}
           {screen === 'dimension' && focusedDimension === 'body' && <Body />}
           {screen === 'dimension' && focusedDimension === 'mind' && <Mind />}
           {screen === 'dimension' && focusedDimension === 'diet' && <Diet />}

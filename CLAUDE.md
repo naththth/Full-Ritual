@@ -157,7 +157,23 @@ A ordem é deliberada — não pular etapa.
 - **Antes de tocar uma tela grande** (`Body.tsx` 1947 linhas, `Mind.tsx` 1040, `Home.tsx` 979, `Diet.tsx` 959): leia inteiro ou faça grep dirigido. Não confie em achar a chamada certa só pelo nome.
 - **`hasSupabase` é false em dev sem `.env.local`.** O app degrada para localStorage. Isso é intencional, mas testes de integração com Supabase precisam de env real.
 - **`useLocalState` ainda é a fonte de verdade** para a maioria dos eixos diários. Não remover sem migração planejada (Fase 1).
-- Migrations já vão até `0025_diet_nutri_profile.sql`. Próxima é `0026_*`.
+- Migrations já vão até `0029_skin_phase4.sql`. Próxima é `0030_*`.
+- **Dimensão Pele** usa tela `Skin.tsx` (não mais `Ritual.tsx`). A navegação `dimension:skin` → `screen: 'skin'` está no store. `Ritual.tsx` permanece para retrocompatibilidade de outros pontos que ainda o referenciam.
+- **IA CARE**: Edge Function em `supabase/functions/ia-care/`. Nunca chamar Gemini diretamente do front. Sempre usar `generateSkinRoutine()` de `src/lib/skinRoutineService.ts`.
+
+---
+
+## 11. IA CARE — regras permanentes
+
+- **IA CARE não é dermatologista.** Não diagnostica, não prescreve, não altera prescrição médica, não promete cura.
+- **Dados reais apenas.** A IA CARE só usa dados explicitamente cadastrados pelo usuário em `skin_profiles` e `skin_products`. Nunca inventar produtos, alergias, diagnósticos ou histórico.
+- **Modo conservador obrigatório** quando houver: rosácea, sensibilidade alta, alergias, gestação, lactação, tentativa de engravidar, uso de retinoides, ácidos ou prescrição médica.
+- **Aromas são ritual sensorial**, nunca tratamento dermatológico. Nunca sugerir aroma diretamente no rosto de pele sensível/rosácea.
+- **Retinoides contraindicados** em gestação/lactação sem orientação médica.
+- **Protetor solar obrigatório** na rotina diurna do rosto quando houver perfil facial.
+- **Prompt interno** reside em `supabase/functions/ia-care/prompt.ts`. Não duplicar regras no front.
+- **Hierarquia**: Segurança dermatológica → dados reais → simplicidade/adesão → objetivos → ritual sensorial.
+- Edge Function `ia-care` valida JWT, lê `user_id` da sessão (nunca do body), busca perfil e produtos do banco, persiste rotina em `skin_routines` + `skin_routine_items`, loga em `skin_ai_logs`.
 
 ---
 

@@ -422,3 +422,74 @@ export interface DailyScore {
   score_spirit: number;
   score_total?: number;
 }
+
+// ---------- PELE / IA CARE ----------
+export type SkinArea = 'face' | 'body' | 'aromas';
+export type SkinPeriod = 'day' | 'night';
+export type SkinRiskLevel = 'baixo' | 'moderado' | 'alto';
+
+export interface SkinProfile {
+  id: string;
+  user_id: string;
+  skin_types: string[];
+  sensitivity: string | null;
+  allergies: string | null;
+  goals: string[];
+  morning_time: string | null;
+  night_time: string | null;
+  routine_preference: string | null;
+  budget: string | null;
+  uses_actives: boolean;
+  uses_prescription: boolean;
+  dermatology_followup: string | null;
+  pregnancy_lactation_status: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkinProduct {
+  id: string;
+  user_id: string;
+  name: string;
+  brand: string | null;
+  category: string | null;
+  area: SkinArea | null;
+  current_frequency: string | null;
+  causes_irritation: boolean;
+  is_prescription: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkinRoutineItem {
+  id: string;
+  user_id: string;
+  routine_id: string;
+  product_id: string | null;
+  product_name: string;
+  brand: string | null;
+  category: string | null;
+  area: SkinArea;
+  period: SkinPeriod;
+  order_index: number;
+  frequency: string | null;
+  instructions: string | null;
+  safety_note: string | null;
+  is_prescription: boolean;
+  is_checked: boolean;
+  checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkinRoutine {
+  id: string;
+  user_id: string;
+  routine_json: Record<string, unknown>;
+  risk_level: SkinRiskLevel | null;
+  generated_by: string;
+  created_at: string;
+  updated_at: string;
+  skin_routine_items: SkinRoutineItem[];
+}
