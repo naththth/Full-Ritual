@@ -360,7 +360,8 @@ export function Diet() {
       setNutriStep('result');
     } catch (err) {
       console.error('generate ia-nutri', err);
-      showToast('não foi possível gerar orientação. Verifique se a função ia-nutri está publicada.');
+      const message = await readFunctionError(err);
+      showToast(message ?? 'não foi possível gerar orientação da IA NUTRI.');
     }
     finally { setAiLoading(false); }
   };
@@ -1296,6 +1297,17 @@ function NutriTextarea({ label, value, onChange, placeholder }: {
       <textarea className="field" rows={3} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </label>
   );
+}
+
+async function readFunctionError(err: unknown): Promise<string | null> {
+  const context = (err as { context?: unknown })?.context;
+  if (context instanceof Response) {
+    const data = await context.clone().json().catch(() => null) as { error?: unknown } | null;
+    if (typeof data?.error === 'string') return data.error;
+    return `IA NUTRI retornou erro ${context.status}.`;
+  }
+  const message = (err as { message?: unknown })?.message;
+  return typeof message === 'string' ? message : null;
 }
 
 // Compatibilidade: tipos usados em outros módulos

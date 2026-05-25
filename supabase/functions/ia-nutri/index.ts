@@ -17,7 +17,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,13 +40,13 @@ Deno.serve(async (req: Request) => {
   let body: { question?: string; date?: string; user_jwt?: string } = {};
   try { body = await req.json(); } catch { /* nenhum body */ }
 
-  const userJwt = req.headers.get('x-user-jwt')
-    ?? (typeof body.user_jwt === 'string' ? body.user_jwt : undefined)
-    ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!userJwt) return json({ error: 'token de usuário ausente' }, 401);
+  const authHeader = req.headers.get('Authorization')
+    ?? req.headers.get('authorization')
+    ?? (typeof body.user_jwt === 'string' ? `Bearer ${body.user_jwt}` : null);
+  if (!authHeader) return json({ error: 'sem token de autenticação' }, 401);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { authorization: `Bearer ${userJwt}` } },
+    global: { headers: { Authorization: authHeader } },
   });
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -92,8 +92,6 @@ Deno.serve(async (req: Request) => {
     : 'Com base no meu perfil nutricional, por favor faça uma análise inicial e forneça orientações práticas para minha alimentação.';
 
   const prompt = [
-    IA_NUTRI_SYSTEM_PROMPT,
-    '',
     'DADOS REAIS DO USUÁRIO:',
     context,
     '',
@@ -109,27 +107,28 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: IA_NUTRI_SYSTEM_PROMPT }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        ],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 2200,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
 
     if (!geminiRes.ok) {
       const err = await geminiRes.text();
       console.error('Gemini error:', err);
-      return json({ error: 'IA indisponível. Tente novamente.' }, 503);
+      return json({ error: 'falha ao consultar a IA NUTRI' }, 502);
     }
 
     const geminiData = await geminiRes.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    if (!aiResponse) return json({ error: 'IA retornou resposta vazia.' }, 503);
+    if (!aiResponse) return json({ error: 'IA NUTRI retornou resposta vazia.' }, 502);
   } catch (err) {
     console.error('Gemini fetch error:', err);
-    return json({ error: 'Erro ao conectar com a IA. Tente novamente.' }, 503);
+    return json({ error: 'erro ao conectar com a IA NUTRI' }, 502);
   }
 
   // Persistir log da interação
@@ -140,7 +139,7 @@ Deno.serve(async (req: Request) => {
       diet_profile_id: profileId,
       prompt_summary: question || 'análise inicial',
       response: aiResponse,
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
     });
   } catch (logErr) {
     console.error('Falha ao salvar log da IA:', logErr);
