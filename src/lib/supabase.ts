@@ -28,6 +28,9 @@ function getSupabaseOrigin(rawUrl: string | undefined) {
 const SUPABASE_ORIGIN = getSupabaseOrigin(SUPABASE_URL);
 const SUPABASE_KEY = isValidAnonKey(SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : undefined;
 
+export const supabaseOrigin = SUPABASE_ORIGIN;
+export const supabaseAnonKey = SUPABASE_KEY;
+
 function isValidAnonKey(key: string | undefined) {
   if (!key) return false;
   if (key.includes('...') || key === 'placeholder') return false;

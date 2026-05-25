@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:push": "supabase db push",
-    "fn:deploy": "supabase functions deploy gemini-chat && supabase functions deploy regenerate-routine && supabase functions deploy generate-training-plan && supabase functions deploy evaluate-workout && supabase functions deploy body-coach && supabase functions deploy sync-garmin-vitals"
+    "fn:deploy": "supabase functions deploy gemini-chat && supabase functions deploy regenerate-routine && supabase functions deploy generate-training-plan && supabase functions deploy evaluate-workout && supabase functions deploy body-coach && supabase functions deploy sync-garmin-vitals && supabase functions deploy ia-nutri --no-verify-jwt"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { supabase, hasSupabase } from '../lib/supabase';
 import { useApp } from '../store/useStore';
 import type {
-  ContentPref, DimensionKey, MusicPref, SkinType, SportModality, SpiritTheme,
-  TrainingGoal, TrainingModality, DayOfWeek, PreferredTime,
+  ContentPref, DimensionKey, MusicPref, SkinType, SpiritTheme,
 } from '../types';
 
 // ─── opções ────────────────────────────────────────────────────────────────
@@ -14,45 +13,6 @@ const SKIN_TYPES: { value: SkinType; label: string; desc: string }[] = [
   { value: 'seca',     label: 'Seca',     desc: 'sensação de tensão, opaca' },
   { value: 'sensivel', label: 'Sensível', desc: 'reage facilmente, avermelha' },
   { value: 'normal',   label: 'Normal',   desc: 'equilibrada, poucos problemas' },
-];
-
-const SPORTS: { value: SportModality; label: string }[] = [
-  { value: 'corrida',    label: 'corrida'    },
-  { value: 'ciclismo',   label: 'ciclismo'   },
-  { value: 'natacao',    label: 'natação'    },
-  { value: 'forca',      label: 'força'      },
-  { value: 'yoga',       label: 'yoga'       },
-  { value: 'pilates',    label: 'pilates'    },
-  { value: 'mobilidade', label: 'mobilidade' },
-  { value: 'caminhada',  label: 'caminhada'  },
-];
-
-const TRAINING_MODALITIES: { value: TrainingModality; label: string; hint: string }[] = [
-  { value: 'corrida',    label: 'corrida',     hint: 'rua ou esteira' },
-  { value: 'pedal',      label: 'pedal',       hint: 'road, mtb, indoor' },
-  { value: 'musculacao', label: 'musculação',  hint: 'força e hipertrofia' },
-  { value: 'lpo',        label: 'LPO',         hint: 'levantamento olímpico' },
-];
-
-const GOALS: { value: TrainingGoal; label: string; hint: string }[] = [
-  { value: 'fat_loss',     label: 'perder gordura',  hint: 'déficit + cardio' },
-  { value: 'muscle_gain',  label: 'ganhar massa',    hint: 'volume + força' },
-  { value: 'performance',  label: 'performance',     hint: 'meta específica' },
-  { value: 'maintenance',  label: 'manutenção',      hint: 'saúde e consistência' },
-];
-
-const DAYS: { value: DayOfWeek; label: string }[] = [
-  { value: 'mon', label: 'Seg' }, { value: 'tue', label: 'Ter' },
-  { value: 'wed', label: 'Qua' }, { value: 'thu', label: 'Qui' },
-  { value: 'fri', label: 'Sex' }, { value: 'sat', label: 'Sáb' },
-  { value: 'sun', label: 'Dom' },
-];
-
-const TIMES: { value: PreferredTime; label: string }[] = [
-  { value: 'morning',   label: 'manhã'     },
-  { value: 'afternoon', label: 'tarde'     },
-  { value: 'evening',   label: 'noite'     },
-  { value: 'flexible',  label: 'flexível'  },
 ];
 
 const CONTENT: { value: ContentPref; label: string }[] = [
@@ -107,10 +67,6 @@ type StepId =
   | 'sexo'
   | 'dimensoes'
   | 'pele'
-  | 'corpo_modality'
-  | 'corpo_goal'
-  | 'corpo_schedule'
-  | 'corpo_measures'
   | 'mente'
   | 'dieta'
   | 'espirito'
@@ -128,10 +84,6 @@ const STEP_META: Record<StepId, StepMeta> = {
   sexo:            { label: 'seu corpo',               subtitle: 'para personalizar',      color: 'var(--skin)'   },
   dimensoes:       { label: 'suas dimensões',          subtitle: 'ative ou desative',      color: 'var(--gold)'   },
   pele:            { label: 'sua pele',               subtitle: 'dimensão · Pele',       color: 'var(--skin)'   },
-  corpo_modality:  { label: 'como você se move?',     subtitle: 'dimensão · Corpo',      color: 'var(--body)'   },
-  corpo_goal:      { label: 'qual é seu objetivo?',   subtitle: 'dimensão · Corpo',      color: 'var(--body)'   },
-  corpo_schedule:  { label: 'sua rotina de treino',   subtitle: 'dimensão · Corpo',      color: 'var(--body)'   },
-  corpo_measures:  { label: 'seus números',           subtitle: 'dimensão · Corpo',      color: 'var(--body)'   },
   mente:           { label: 'sua mente',              subtitle: 'dimensão · Mente',      color: 'var(--mind)'   },
   dieta:           { label: 'sua dieta',              subtitle: 'dimensão · Dieta',      color: 'var(--diet)'   },
   espirito:        { label: 'sua essência',           subtitle: 'dimensão · Espírito',   color: 'var(--spirit)' },
@@ -259,17 +211,6 @@ export function Onboarding() {
   // pele
   const [skinType, setSkinType] = useState<SkinType | null>(null);
 
-  // corpo
-  const [trainingMods, setTrainingMods] = useState<TrainingModality[]>([]);
-  const [sports, setSports] = useState<SportModality[]>([]);
-  const [trainingGoal, setTrainingGoal] = useState<TrainingGoal | null>(null);
-  const [availDays, setAvailDays] = useState<DayOfWeek[]>([]);
-  const [prefTime, setPrefTime] = useState<PreferredTime | null>(null);
-  const [sessionMin, setSessionMin] = useState<number | ''>(60);
-  const [weightKg, setWeightKg] = useState<number | ''>('');
-  const [heightCm, setHeightCm] = useState<number | ''>('');
-  const [targetWeight, setTargetWeight] = useState<number | ''>('');
-
   // mente
   const [contentPrefs, setContentPrefs] = useState<ContentPref[]>([]);
   const [musicPrefs, setMusicPrefs] = useState<MusicPref[]>([]);
@@ -277,7 +218,6 @@ export function Onboarding() {
   const [goalMeditationMin, setGoalMeditationMin] = useState<number | ''>(10);
 
   // dieta
-  const [goalWaterL, setGoalWaterL] = useState<number | ''>(2.5);
   const [dietSetupMode, setDietSetupMode] = useState<'existing_plan' | 'needs_ai_nutri' | null>(null);
 
   // espírito
@@ -296,7 +236,6 @@ export function Onboarding() {
     const newDims = isReconfig ? dims.filter(d => !prevDims.includes(d)) : dims;
     const base: StepId[] = isReconfig ? ['dimensoes'] : ['nome', 'sexo', 'dimensoes'];
     if (newDims.includes('skin'))   base.push('pele');
-    if (newDims.includes('body'))   base.push('corpo_modality', 'corpo_goal', 'corpo_schedule', 'corpo_measures');
     if (newDims.includes('mind'))   base.push('mente');
     if (newDims.includes('diet'))   base.push('dieta');
     if (newDims.includes('spirit')) base.push('espirito');
@@ -327,13 +266,6 @@ export function Onboarding() {
   const finish = async () => {
     setSaving(true);
 
-    const sportsList: SportModality[] = [
-      ...sports,
-      ...(trainingMods.includes('corrida') && !sports.includes('corrida') ? ['corrida' as SportModality] : []),
-      ...(trainingMods.includes('pedal')   && !sports.includes('ciclismo') ? ['ciclismo' as SportModality] : []),
-      ...(trainingMods.includes('musculacao') && !sports.includes('forca') ? ['forca' as SportModality] : []),
-    ];
-
     const now = new Date().toISOString();
     const selectedDims = dims.length > 0 ? dims : (['skin', 'body', 'mind', 'diet', 'spirit'] as DimensionKey[]);
 
@@ -343,7 +275,7 @@ export function Onboarding() {
       birthdate: birthdate || null,
       biological_sex: sexo,
       skin_type: skinType,
-      sport_modalities: sportsList,
+      sport_modalities: profile?.sport_modalities ?? [],
       music_prefs: musicPrefs,
       content_prefs: contentPrefs,
       spirit_themes: spiritThemes,
@@ -351,14 +283,14 @@ export function Onboarding() {
       cycle_tracking: cycleTracking,
       cycle_length: cycleTracking ? (Number(cycleLength) || 28) : 28,
       cycle_start: null,
-      target_weight_kg: targetWeight !== '' ? Number(targetWeight) : null,
-      target_weight_kg_max: null,
-      target_body_fat_pct: null,
-      target_date: null,
+      target_weight_kg: profile?.target_weight_kg ?? null,
+      target_weight_kg_max: profile?.target_weight_kg_max ?? null,
+      target_body_fat_pct: profile?.target_body_fat_pct ?? null,
+      target_date: profile?.target_date ?? null,
       ai_enabled: true,
       notifications_enabled: true,
-      goal_sleep_h: 8,
-      goal_water_l: goalWaterL !== '' ? Number(goalWaterL) : 2.5,
+      goal_sleep_h: profile?.goal_sleep_h ?? 8,
+      goal_water_l: profile?.goal_water_l ?? null,
       goal_meditation_min: goalMeditationMin !== '' ? Number(goalMeditationMin) : 10,
       goal_reading_pages: goalReadingPages !== '' ? Number(goalReadingPages) : 20,
       selected_dimensions: selectedDims,
@@ -373,38 +305,6 @@ export function Onboarding() {
         onboarding_completed_at: now,
       }).select('*').single();
       if (data) setProfile(data);
-
-      // training_profile se corpo foi selecionado
-      if (dims.includes('body') && trainingMods.length > 0) {
-        await supabase.from('training_profiles').upsert({
-          user_id: userId,
-          modalities: trainingMods,
-          available_days: availDays,
-          preferred_time: prefTime ?? 'flexible',
-          session_minutes: sessionMin !== '' ? Number(sessionMin) : 60,
-          main_goal: trainingGoal ?? 'maintenance',
-          consistency_band: null,
-          limitations: null,
-          corrida_pace_min_per_km: null, corrida_max_distance_km: null,
-          corrida_has_race: false, corrida_race_info: null, corrida_location: null,
-          pedal_ftp_watts: null, pedal_type: null, pedal_weekly_km: null,
-          pedal_has_event: false, pedal_event_info: null,
-          strength_location: null, strength_equipment: null, strength_split: null,
-          lpo_saturday_9am: false, lpo_has_coach: false, lpo_movements: null,
-        });
-
-        // medidas corporais iniciais se informadas
-        if (weightKg !== '' || heightCm !== '') {
-          await supabase.from('body_metrics').insert({
-            user_id: userId,
-            date: new Date().toISOString().slice(0, 10),
-            weight_kg: weightKg !== '' ? Number(weightKg) : null,
-            height_cm: heightCm !== '' ? Number(heightCm) : null,
-            body_fat_pct: null, waist_cm: null, hip_cm: null,
-            chest_cm: null, arm_cm: null, thigh_cm: null, neck_cm: null,
-          });
-        }
-      }
 
       if (dims.includes('diet') && dietSetupMode) {
         await supabase.from('diet_plans').upsert({
@@ -489,83 +389,6 @@ export function Onboarding() {
       </div>
     );
 
-    if (step === 'corpo_modality') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p style={sub}>Quais modalidades você pratica? (pode marcar várias)</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {TRAINING_MODALITIES.map(m => (
-            <CardOption key={m.value} label={m.label} hint={m.hint}
-              active={trainingMods.includes(m.value)} color={c}
-              onClick={() => setTrainingMods(toggle(trainingMods, m.value))} />
-          ))}
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <label style={fieldLabel}>Outros esportes (caminhada, yoga, etc.)</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-            {SPORTS.filter(s => !['corrida', 'ciclismo', 'forca'].includes(s.value)).map(s => (
-              <Pill key={s.value} label={s.label} active={sports.includes(s.value)} color={c}
-                onClick={() => setSports(toggle(sports, s.value))} />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-
-    if (step === 'corpo_goal') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p style={sub}>Qual é o seu principal objetivo agora?</p>
-        {GOALS.map(g => (
-          <CardOption key={g.value} label={g.label} hint={g.hint}
-            active={trainingGoal === g.value} color={c}
-            onClick={() => setTrainingGoal(g.value)} />
-        ))}
-      </div>
-    );
-
-    if (step === 'corpo_schedule') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <p style={{ ...sub, margin: '0 0 10px' }}>Quais dias você treina?</p>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {DAYS.map(d => (
-              <button key={d.value} onClick={() => setAvailDays(toggle(availDays, d.value))}
-                style={{
-                  flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  background: availDays.includes(d.value) ? c : 'rgba(58,31,22,0.06)',
-                  color: availDays.includes(d.value) ? '#fff' : 'var(--chocolate)',
-                  border: `1.5px solid ${availDays.includes(d.value) ? c : 'rgba(58,31,22,0.12)'}`,
-                  transition: 'all 180ms',
-                }}>
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p style={{ ...sub, margin: '0 0 10px' }}>Horário preferido?</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {TIMES.map(t => (
-              <Pill key={t.value} label={t.label} active={prefTime === t.value} color={c}
-                onClick={() => setPrefTime(t.value)} />
-            ))}
-          </div>
-        </div>
-        <NumericInput label="Duração por sessão" value={sessionMin} onChange={setSessionMin}
-          unit="minutos" min={20} max={240} step={5} />
-      </div>
-    );
-
-    if (step === 'corpo_measures') return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <p style={sub}>Seus dados iniciais. Tudo opcional — você pode preencher depois.</p>
-        <NumericInput label="Peso atual" value={weightKg} onChange={setWeightKg} unit="kg" min={30} max={250} step={0.1} />
-        <NumericInput label="Altura" value={heightCm} onChange={setHeightCm} unit="cm" min={100} max={250} />
-        {(trainingGoal === 'fat_loss' || trainingGoal === 'muscle_gain') && (
-          <NumericInput label="Peso alvo" value={targetWeight} onChange={setTargetWeight} unit="kg" min={30} max={250} step={0.1} />
-        )}
-      </div>
-    );
-
     if (step === 'mente') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
@@ -595,8 +418,7 @@ export function Onboarding() {
 
     if (step === 'dieta') return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <p style={sub}>Vamos acompanhar sua hidratação e refeições.</p>
-        <NumericInput label="Meta de água" value={goalWaterL} onChange={setGoalWaterL} unit="litros/dia" min={0.5} max={6} step={0.25} />
+        <p style={sub}>Escolha só o ponto de partida. Meta de água fica dentro da dimensão Dieta; peso e objetivo ficam no IA NUTRI.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <CardOption
             label="Já possuo uma dieta"

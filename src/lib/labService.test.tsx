@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
@@ -12,11 +11,8 @@ import type { LabMarker, LabResult } from '../types';
 // ---------- Mock Supabase ----------
 
 const mockSingle = vi.fn();
-const mockSelect = vi.fn();
 const mockEq = vi.fn();
-const mockOrder = vi.fn();
 const mockLimit = vi.fn();
-const mockInsert = vi.fn();
 const mockUpload = vi.fn();
 const mockGetPublicUrl = vi.fn();
 

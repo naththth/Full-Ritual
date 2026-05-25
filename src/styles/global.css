@@ -1543,6 +1543,320 @@ input[type="password"]::placeholder { color: rgba(245, 238, 223, 0.45); }
   gap: 8px;
 }
 
+.diet-path-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.diet-path-card {
+  width: 100%;
+  min-height: 92px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "icon title"
+    "icon copy";
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  text-align: left;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--diet) 22%, rgba(74,44,34,0.10));
+  background:
+    linear-gradient(145deg, rgba(255, 252, 244, 0.92), color-mix(in srgb, var(--diet) 7%, rgba(255,252,244,0.78)));
+  box-shadow: 0 10px 24px rgba(74, 44, 34, 0.06);
+  transition: transform var(--t-fast) var(--e-spring), border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+}
+
+.diet-path-card:hover,
+.diet-path-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--diet) 44%, rgba(74,44,34,0.10));
+  box-shadow: 0 16px 34px rgba(74, 44, 34, 0.11);
+  outline: none;
+}
+
+.diet-path-card:active {
+  transform: scale(0.985);
+}
+
+.diet-path-card__icon {
+  grid-area: icon;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--diet) 16%, rgba(255,255,255,0.86));
+  color: var(--diet-deep);
+  border: 1px solid color-mix(in srgb, var(--diet) 28%, transparent);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.diet-path-card strong {
+  grid-area: title;
+  display: block;
+  min-width: 0;
+  color: var(--chocolate);
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.diet-path-card small {
+  grid-area: copy;
+  display: block;
+  min-width: 0;
+  color: rgba(74,44,34,0.62);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.diet-daily-panel {
+  display: grid;
+  gap: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--diet) 18%, transparent), transparent 54%),
+    rgba(255, 252, 244, 0.9);
+  border-color: color-mix(in srgb, var(--diet) 24%, rgba(74,44,34,0.08));
+}
+
+.diet-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(74,44,34,0.07);
+  color: rgba(74,44,34,0.72);
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.diet-status-pill--concluido,
+.diet-status-pill--em_andamento {
+  background: color-mix(in srgb, var(--diet) 16%, rgba(255,255,255,0.72));
+  color: var(--diet-deep);
+}
+
+.diet-status-pill--abaixo_da_meta,
+.diet-status-pill--acima_da_meta {
+  background: rgba(178, 101, 72, 0.13);
+  color: #7c3f2d;
+}
+
+.diet-macro-chip__sub {
+  margin-top: 2px;
+  color: rgba(74,44,34,0.48);
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.diet-macro-chip--highlight .diet-macro-chip__sub {
+  color: rgba(245,238,223,0.78);
+}
+
+.diet-water-mini,
+.diet-water-display {
+  display: grid;
+  gap: 8px;
+}
+
+.diet-water-bar {
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(74,44,34,0.08);
+  box-shadow: inset 0 1px 2px rgba(74,44,34,0.08);
+}
+
+.diet-water-bar--lg {
+  height: 14px;
+}
+
+.diet-water-bar__fill {
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--diet-glow), var(--diet));
+  transition: width var(--t-med) var(--e-soft);
+}
+
+.diet-nutri-summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--diet) 8%, rgba(255,252,244,0.86));
+  border: 1px solid color-mix(in srgb, var(--diet) 18%, transparent);
+}
+
+.diet-nutri-summary span,
+.diet-ai-response p {
+  overflow-wrap: anywhere;
+}
+
+.diet-target-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 13px 14px;
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--diet) 13%, rgba(255,252,244,0.92)), rgba(255,255,255,0.58));
+  border: 1px solid color-mix(in srgb, var(--diet) 28%, transparent);
+}
+
+.diet-target-preview .eyebrow {
+  color: color-mix(in srgb, var(--diet) 74%, var(--chocolate));
+}
+
+.diet-target-preview strong,
+.diet-target-preview small {
+  display: block;
+}
+
+.diet-target-preview strong {
+  color: var(--diet-deep);
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+.diet-target-preview small {
+  margin-top: 3px;
+  color: rgba(74,44,34,0.62);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.diet-option-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--diet) 7%, rgba(255,252,244,0.78));
+  border: 1px solid color-mix(in srgb, var(--diet) 20%, transparent);
+}
+
+.diet-option-block {
+  display: grid;
+  gap: 8px;
+}
+
+.diet-field-label-text {
+  display: block;
+  color: rgba(74,44,34,0.54);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.diet-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.52);
+  border: 1px solid rgba(74,44,34,0.08);
+  text-align: left;
+}
+
+.diet-toggle-row span {
+  color: var(--chocolate);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.diet-toggle-row strong {
+  min-width: 42px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(74,44,34,0.07);
+  color: rgba(74,44,34,0.64);
+  font-size: 11px;
+  text-align: center;
+}
+
+.diet-toggle-row--active strong {
+  background: var(--diet);
+  color: var(--ivory);
+}
+
+.diet-exam-shortcut {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.48);
+  border: 1px solid rgba(74,44,34,0.08);
+}
+
+.diet-ai-response {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255,252,244,0.72);
+  border: 1px solid rgba(74,44,34,0.08);
+}
+
+.diet-upload-area {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px dashed color-mix(in srgb, var(--diet) 36%, rgba(74,44,34,0.10));
+  background: color-mix(in srgb, var(--diet) 7%, rgba(255,252,244,0.78));
+}
+
+.diet-pdf-card {
+  display: grid;
+  gap: 12px;
+}
+
+.diet-pdf-card__header {
+  display: grid;
+  gap: 12px;
+}
+
+.diet-pdf-card__header strong,
+.diet-pdf-card__header small {
+  display: block;
+}
+
+.diet-pdf-card__header small {
+  margin-top: 3px;
+  color: rgba(74,44,34,0.55);
+  font-size: 12px;
+}
+
+.diet-pdf-viewer {
+  width: 100%;
+  height: min(58dvh, 520px);
+  min-height: 360px;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(74,44,34,0.10);
+  background: rgba(255,252,244,0.76);
+}
+
+.diet-pdf-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .diet-nutri-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1841,6 +2155,101 @@ input[type="password"]::placeholder { color: rgba(245, 238, 223, 0.45); }
   gap: 8px;
 }
 
+.diet-meal-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.diet-meal-item {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--diet) 18%, rgba(74,44,34,0.10));
+  background: rgba(255,252,244,0.72);
+}
+
+.diet-meal-item__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.diet-meal-item__header strong,
+.diet-meal-item__header small {
+  display: block;
+}
+
+.diet-meal-item__header small {
+  color: rgba(74,44,34,0.54);
+}
+
+.diet-meal-item__totals,
+.diet-food-row-item__macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diet-meal-item__totals span,
+.diet-food-row-item__macros span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--diet) 10%, rgba(255,255,255,0.76));
+  color: color-mix(in srgb, var(--diet) 72%, var(--chocolate));
+  font-size: 11px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.diet-food-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diet-food-row-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.52);
+  border: 1px solid rgba(74,44,34,0.08);
+}
+
+.diet-food-row-item__info {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.diet-food-row-item__info span {
+  overflow: hidden;
+  color: var(--chocolate);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diet-food-row-item__info small {
+  color: rgba(74,44,34,0.52);
+  font-size: 11px;
+}
+
+.diet-water-target-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
 .diet-manual-item {
   display: flex;
   align-items: center;
@@ -2109,6 +2518,43 @@ input[type="password"]::placeholder { color: rgba(245, 238, 223, 0.45); }
   background: rgba(74, 44, 34, 0.06);
   border-color: var(--line);
   color: var(--chocolate);
+}
+
+.file-button--loading {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+@media (max-width: 390px) {
+  .diet-path-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+    min-height: 86px;
+    padding: 12px;
+  }
+
+  .diet-path-card__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    font-size: 11px;
+  }
+
+  .diet-path-card strong {
+    font-size: 14px;
+  }
+
+  .diet-path-card small {
+    font-size: 11px;
+  }
+
+  .diet-meal-add-row,
+  .diet-water-target-row {
+    grid-template-columns: 1fr;
+  }
+
+  .diet-food-row-item {
+    grid-template-columns: 1fr;
+  }
 }
 
 .photo-preview {

@@ -1,340 +1,435 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import CircleButton from '../components/CircleButton';
 import { CyclePhaseBanner } from '../components/CyclePhaseBanner';
-import { getDefaultMealVariant, MEALS } from '../data/ritualContent';
 import { relativeDateLabel } from '../lib/dates';
 import { uploadImageOrPreview } from '../lib/uploads';
-import { useAutoSave } from '../lib/useAutoSave';
 import { hasSupabase, supabase } from '../lib/supabase';
-import { readJson, writeJson, scopedStorageKey } from '../lib/storage';
-import { saveMealLog, loadDietPlan, saveDietPlan } from '../lib/dietService';
+import { scopedStorageKey, readJson, writeJson } from '../lib/storage';
+import {
+  loadDietProfile, saveDietProfile, loadActiveDietDocument,
+  saveDietDocument, archiveDietDocument, getSignedDietUrl,
+  loadDietMeals, saveDietMeal, deleteDietMeal, updateMealTotals,
+  loadDietFoods, saveDietFood, deleteDietFood,
+  loadWaterDaily, saveWaterDaily,
+  loadLatestNutritionAiLog,
+  type DietProfileRow, type DietDocumentRow, type DietMealRow, type DietFoodRow,
+} from '../lib/dietService';
+import {
+  calcMealTotals, calcDayTotals, calcDayStatus,
+  waterProgressPct, addWaterMl, estimateNutritionTargets,
+  type DayStatus,
+  type NutritionTargets,
+} from '../lib/dietCalculations';
 import { useApp } from '../store/useStore';
-import type { MealType, WorkoutMealPeriod } from '../types';
+import type { MealType } from '../types';
 
-// ─── tipos ───────────────────────────────────────────────────────────────────
+// ── Tipos locais ─────────────────────────────────────────────────────────────
 
-interface Macros {
-  kcal: number;
-  protein_g: number;
-  carb_g: number;
-  fat_g: number;
+type DietPath = 'ia_nutri' | 'dietbox' | 'manual';
+
+interface NutriFormState extends DietProfileRow {
+  _dirty?: boolean;
 }
 
-interface ManualFood {
+interface FoodDraft {
+  name: string;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  notes: string;
+}
+
+interface SearchProduct {
   id: string;
-  meal_type: MealType | null;
-  workout_period: WorkoutMealPeriod | null;
   title: string;
   brand: string;
-  quantity_g: number;
   serving_g: number;
-  macros_per_100g: Macros;
+  kcal_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
 }
 
-interface DietPlan {
-  manualFoods: ManualFood[];
-  pdfUrl: string | null;
-  pdfName: string | null;
-  notes: string;
-  setupMode: 'existing_plan' | 'needs_ai_nutri' | null;
-  nutriProfile: NutriProfile;
-  nutriConfigured: boolean;
-}
-
-interface DietAiAddition {
-  id: string;
-  meal_type: MealType | null;
-  title: string;
-  note?: string | null;
-  rationale?: string | null;
-}
-
-interface NutriProfile {
-  objective: string;
-  objectiveDetails: string;
-  activityLevel: string;
-  trainingRoutine: string;
-  healthContext: string;
-  medications: string;
-  exams: string;
-  pregnancyContext: string;
-  mealRoutine: string;
-  budget: string;
-  cookingSkill: string;
-  restrictions: string;
-  preferences: string;
-  dietHistory: string;
-  appetiteAndEnergy: string;
-}
-
-interface MealState {
-  variant: string;
-  checks: Record<number, boolean>;
-  photoUrl?: string;
-}
-
-interface DietState {
-  water: number;
-  meals: Record<string, MealState>;
-}
-
-// ─── constantes ──────────────────────────────────────────────────────────────
-
-const WORKOUT_MEAL_TYPES: MealType[] = ['pre_treino', 'pos_treino', 'intra_treino'];
-
-const MEAL_LABELS: Record<MealType, string> = {
-  manha: 'Café da Manhã',
-  almoco: 'Almoço',
-  lanche: 'Lanche',
-  jantar: 'Jantar',
-  ceia: 'Ceia',
-  pre_treino: 'Pré-treino',
-  pos_treino: 'Pós-treino',
-  intra_treino: 'Intra-treino',
-};
-
-const WORKOUT_PERIOD_LABELS: Record<WorkoutMealPeriod, string> = {
-  manha: 'Manhã',
-  tarde: 'Tarde',
-  noite: 'Noite',
-};
-
-const MEAL_ORDER: MealType[] = ['manha', 'almoco', 'lanche', 'jantar', 'ceia', 'pre_treino', 'pos_treino', 'intra_treino'];
-
-const initialNutriProfile: NutriProfile = {
-  objective: '', objectiveDetails: '', activityLevel: '', trainingRoutine: '',
-  healthContext: '', medications: '', exams: '', pregnancyContext: '',
-  mealRoutine: '', budget: '', cookingSkill: '', restrictions: '',
-  preferences: '', dietHistory: '', appetiteAndEnergy: '',
-};
-
-const initialPlan: DietPlan = {
-  manualFoods: [], pdfUrl: null, pdfName: null, notes: '',
-  setupMode: null, nutriProfile: initialNutriProfile, nutriConfigured: false,
-};
-
-const initialDiet: DietState = { water: 0, meals: {} };
-
-const emptyMacros: Macros = { kcal: 0, protein_g: 0, carb_g: 0, fat_g: 0 };
-
-const emptyDraft = (): Omit<ManualFood, 'id'> => ({
-  meal_type: null,
-  workout_period: null,
-  title: '',
-  brand: '',
-  quantity_g: 100,
-  serving_g: 100,
-  macros_per_100g: { ...emptyMacros },
+const emptyFoodDraft = (): FoodDraft => ({
+  name: '', quantity: 100, unit: 'g',
+  calories: 0, protein: 0, carbs: 0, fat: 0, notes: '',
 });
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+const emptyProfile = (): DietProfileRow => ({
+  goal: '', objective_details: '', activity_level: '', work_routine: '',
+  desired_meals_count: undefined, hunger_level: '',
+  training_routine: '', training_frequency: '', training_schedule: '',
+  training_duration_min: undefined, training_intensity: '',
+  fasted_training: false, sports_goal: '',
+  liked_foods: '', avoided_foods: '', current_water_ml: undefined, supplements: '',
+  dietary_restrictions: '', intolerances: '', allergies: '',
+  digestive_symptoms: '', injuries: '', medications: '', relevant_exams: '',
+  pregnancy_context: '', professional_calories: undefined,
+  professional_protein_g: undefined, professional_carbs_g: undefined,
+  professional_fat_g: undefined, professional_notes: '',
+  diet_history: '', appetite_and_energy: '', budget: '', cooking_skill: '',
+  available_meal_times: '',
+});
 
-function foodMacros(food: ManualFood): Macros {
-  const ratio = food.quantity_g / 100;
-  return {
-    kcal: Math.round(food.macros_per_100g.kcal * ratio),
-    protein_g: Math.round(food.macros_per_100g.protein_g * ratio * 10) / 10,
-    carb_g: Math.round(food.macros_per_100g.carb_g * ratio * 10) / 10,
-    fat_g: Math.round(food.macros_per_100g.fat_g * ratio * 10) / 10,
-  };
-}
+const DAY_STATUS_LABELS: Record<DayStatus, string> = {
+  sem_dados: 'sem registros',
+  planejado: 'planejado',
+  em_andamento: 'em andamento',
+  concluido: 'concluído',
+  parcial: 'parcial',
+  abaixo_da_meta: 'abaixo da meta',
+  acima_da_meta: 'acima da meta',
+};
 
-function totalMacros(foods: ManualFood[]): Macros {
-  return foods.reduce(
-    (acc, food) => {
-      const m = foodMacros(food);
-      return {
-        kcal: acc.kcal + m.kcal,
-        protein_g: Math.round((acc.protein_g + m.protein_g) * 10) / 10,
-        carb_g: Math.round((acc.carb_g + m.carb_g) * 10) / 10,
-        fat_g: Math.round((acc.fat_g + m.fat_g) * 10) / 10,
-      };
-    },
-    { ...emptyMacros },
-  );
-}
+const TRAINING_FREQUENCY_OPTIONS = [
+  { value: 'nao_treino', label: 'não treino hoje' },
+  { value: '1_2_semana', label: '1-2x/semana' },
+  { value: '3_4_semana', label: '3-4x/semana' },
+  { value: '5_6_semana', label: '5-6x/semana' },
+  { value: 'alto_volume', label: 'alto volume' },
+];
 
-function normalizeNutriProfile(value: unknown): NutriProfile {
-  if (!value || typeof value !== 'object') return initialNutriProfile;
-  return { ...initialNutriProfile, ...(value as Partial<NutriProfile>) };
-}
+const TRAINING_SCHEDULE_OPTIONS = [
+  { value: 'manha', label: 'manhã' },
+  { value: 'tarde', label: 'tarde' },
+  { value: 'noite', label: 'noite' },
+  { value: 'variavel', label: 'varia' },
+];
 
-function normalizeFoods(raw: unknown): ManualFood[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item: unknown) => {
-    const f = item as Record<string, unknown>;
-    return {
-      id: String(f.id ?? crypto.randomUUID()),
-      meal_type: (f.meal_type as MealType | null) ?? null,
-      workout_period: (f.workout_period as WorkoutMealPeriod | null) ?? null,
-      title: String(f.title ?? ''),
-      brand: String(f.brand ?? ''),
-      quantity_g: Number(f.quantity_g ?? 100),
-      serving_g: Number(f.serving_g ?? 100),
-      macros_per_100g: {
-        kcal: Number((f.macros_per_100g as Record<string, unknown>)?.kcal ?? 0),
-        protein_g: Number((f.macros_per_100g as Record<string, unknown>)?.protein_g ?? 0),
-        carb_g: Number((f.macros_per_100g as Record<string, unknown>)?.carb_g ?? 0),
-        fat_g: Number((f.macros_per_100g as Record<string, unknown>)?.fat_g ?? 0),
-      },
-    };
-  });
-}
+const TRAINING_DURATION_OPTIONS = [
+  { value: 30, label: 'até 30 min' },
+  { value: 45, label: '45 min' },
+  { value: 60, label: '60 min' },
+  { value: 90, label: '90+ min' },
+];
 
-// ─── Open Food Facts API ──────────────────────────────────────────────────────
+const TRAINING_INTENSITY_OPTIONS: { value: NonNullable<DietProfileRow['training_intensity']>; label: string }[] = [
+  { value: 'leve', label: 'leve' },
+  { value: 'moderada', label: 'moderada' },
+  { value: 'intensa', label: 'intensa' },
+  { value: 'variavel', label: 'varia' },
+];
 
-interface FoodProduct {
-  id: string;
-  title: string;
-  brand: string;
-  serving_g: number;
-  macros_per_100g: Macros;
-}
+// ── USDA food search ──────────────────────────────────────────────────────────
 
-// USDA FoodData Central — rápido, gratuito, excelente base de dados
-async function searchFoods(query: string): Promise<FoodProduct[]> {
+async function searchFoods(query: string): Promise<SearchProduct[]> {
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=8&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)&api_key=DEMO_KEY`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error('usda fail');
     const data = await res.json() as { foods?: unknown[] };
-    const results = (data.foods ?? [])
-      .map((f: unknown) => {
-        const food = f as Record<string, unknown>;
-        const nutrients = (food.foodNutrients ?? []) as { nutrientId: number; value: number }[];
-        const get = (id: number) => nutrients.find((n) => n.nutrientId === id)?.value ?? 0;
-        const kcal = get(1008);
-        const protein = get(1003);
-        const carb = get(1005);
-        const fat = get(1004);
-        if (!kcal) return null;
-        return {
-          id: String(food.fdcId ?? ''),
-          title: String(food.description ?? ''),
-          brand: String(food.brandOwner ?? food.brandName ?? ''),
-          serving_g: Number(food.servingSize ?? 100),
-          macros_per_100g: { kcal, protein_g: protein, carb_g: carb, fat_g: fat },
-        } satisfies FoodProduct;
-      })
-      .filter((p): p is FoodProduct => p !== null);
+    const results = (data.foods ?? []).map((f: unknown) => {
+      const food = f as Record<string, unknown>;
+      const nutrients = (food.foodNutrients ?? []) as { nutrientId: number; value: number }[];
+      const get = (id: number) => nutrients.find((n) => n.nutrientId === id)?.value ?? 0;
+      const kcal = get(1008);
+      if (!kcal) return null;
+      return {
+        id: String(food.fdcId ?? ''),
+        title: String(food.description ?? ''),
+        brand: String(food.brandOwner ?? food.brandName ?? ''),
+        serving_g: Number(food.servingSize ?? 100),
+        kcal_per_100g: kcal, protein_per_100g: get(1003),
+        carbs_per_100g: get(1005), fat_per_100g: get(1004),
+      } satisfies SearchProduct;
+    }).filter((p): p is SearchProduct => p !== null);
     if (results.length > 0) return results;
-  } catch { /* fallback para OFF */ }
+  } catch { /* fallback */ }
 
-  // fallback: Open Food Facts
   try {
     const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=6&fields=id,product_name,brands,nutriments,serving_quantity`;
     const res = await fetch(offUrl, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return [];
     const data = await res.json() as { products?: unknown[] };
-    return (data.products ?? [])
-      .map((p: unknown) => {
-        const product = p as Record<string, unknown>;
-        const n = (product.nutriments ?? {}) as Record<string, unknown>;
-        const kcal = Number(n['energy-kcal_100g'] ?? 0);
-        if (!product.product_name || !kcal) return null;
-        return {
-          id: String(product.id ?? product.code ?? ''),
-          title: String(product.product_name ?? ''),
-          brand: String(product.brands ?? ''),
-          serving_g: Number(product.serving_quantity ?? 100),
-          macros_per_100g: {
-            kcal, protein_g: Number(n['proteins_100g'] ?? 0),
-            carb_g: Number(n['carbohydrates_100g'] ?? 0),
-            fat_g: Number(n['fat_100g'] ?? 0),
-          },
-        } satisfies FoodProduct;
-      })
-      .filter((p): p is FoodProduct => p !== null);
+    return (data.products ?? []).map((p: unknown) => {
+      const product = p as Record<string, unknown>;
+      const n = (product.nutriments ?? {}) as Record<string, unknown>;
+      const kcal = Number(n['energy-kcal_100g'] ?? 0);
+      if (!product.product_name || !kcal) return null;
+      return {
+        id: String(product.id ?? product.code ?? ''),
+        title: String(product.product_name ?? ''),
+        brand: String(product.brands ?? ''),
+        serving_g: Number(product.serving_quantity ?? 100),
+        kcal_per_100g: kcal, protein_per_100g: Number(n['proteins_100g'] ?? 0),
+        carbs_per_100g: Number(n['carbohydrates_100g'] ?? 0), fat_per_100g: Number(n['fat_100g'] ?? 0),
+      } satisfies SearchProduct;
+    }).filter((p): p is SearchProduct => p !== null);
   } catch { return []; }
 }
 
-// ─── componente principal ────────────────────────────────────────────────────
-
-const orderedMealVariants = (variants: Record<string, unknown>) => [
-  'principal',
-  ...Object.keys(variants).filter((v) => v !== 'principal'),
-];
+// ── Componente principal ──────────────────────────────────────────────────────
 
 export function Diet() {
   const userId = useApp((s) => s.userId);
   const profile = useApp((s) => s.profile);
-  const sexo = useApp((s) => s.sexo);
   const showToast = useApp((s) => s.showToast);
   const selectedDate = useApp((s) => s.selectedDate);
+  const goTo = useApp((s) => s.goTo);
 
-  const dietKey = scopedStorageKey(`full-ritual-diet-${selectedDate}`, userId ?? '');
-  const planKey = scopedStorageKey('full-ritual-diet-plan', userId ?? '');
-  const [diet, setDiet] = useState<DietState>(() => readJson(dietKey, initialDiet));
-  const [storedDietPlan, setDietPlan] = useState<DietPlan>(() => readJson(planKey, initialPlan));
-  const dietPlan: DietPlan = {
-    ...initialPlan,
-    ...storedDietPlan,
-    manualFoods: normalizeFoods(storedDietPlan.manualFoods),
-    nutriProfile: normalizeNutriProfile(storedDietPlan.nutriProfile),
-    nutriConfigured: Boolean(storedDietPlan.nutriConfigured),
-  };
+  // ── Estado da dimensão ────────────────────────────────────────────────────
 
-  const [aiAdditions, setAiAdditions] = useState<DietAiAddition[]>([]);
-  const [showFoodForm, setShowFoodForm] = useState(false);
-  const [draft, setDraft] = useState<Omit<ManualFood, 'id'>>(emptyDraft());
+  const [activePath, setActivePath] = useState<DietPath | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Perfil nutricional (IA NUTRI)
+  const [nutriProfile, setNutriProfile] = useState<NutriFormState>(emptyProfile());
+  const [nutriSaved, setNutriSaved] = useState(false);
+  const [nutriStep, setNutriStep] = useState<'form' | 'confirm' | 'result'>('form');
+  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // DietBox PDF
+  const [pdfDoc, setPdfDoc] = useState<DietDocumentRow | null>(null);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+
+  // Dieta manual
+  const [meals, setMeals] = useState<DietMealRow[]>([]);
+  const [foodsByMeal, setFoodsByMeal] = useState<Record<string, DietFoodRow[]>>({});
+  const [addingMealName, setAddingMealName] = useState('');
+  const [editingFoodMealId, setEditingFoodMealId] = useState<string | null>(null);
+  const [foodDraft, setFoodDraft] = useState<FoodDraft>(emptyFoodDraft());
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<FoodProduct[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchProduct[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const dateLabel = relativeDateLabel(selectedDate);
-  const target = profile?.goal_water_l ?? 2.5;
-  const totals = totalMacros(dietPlan.manualFoods);
+  // Água
+  const nutriStorageKey = scopedStorageKey('diet-nutri-profile', userId ?? '');
+  const waterStorageKey = scopedStorageKey(`diet-water-${selectedDate}`, userId ?? '');
+  const [consumedMl, setConsumedMl] = useState(0);
+  const [targetMl, setTargetMl] = useState(() => Math.round((profile?.goal_water_l ?? 2.5) * 1000));
 
-  // Sync diet state to localStorage cache when it changes
-  useEffect(() => { writeJson(dietKey, diet); }, [dietKey, diet]);
-  useEffect(() => { writeJson(planKey, storedDietPlan); }, [planKey, storedDietPlan]);
+  // ── Carregamento inicial ──────────────────────────────────────────────────
 
-  // Load diet_plans from Supabase (source of truth)
   useEffect(() => {
-    if (!hasSupabase || !userId) return;
-    let alive = true;
-    loadDietPlan(userId)
-      .then((data) => {
-        if (!alive || !data) return;
-        const plan: DietPlan = {
-          manualFoods: normalizeFoods(data.manual_foods),
-          pdfUrl: data.pdf_url ?? null,
-          pdfName: data.pdf_name ?? null,
-          notes: data.notes ?? '',
-          setupMode: data.setup_mode as DietPlan['setupMode'],
-          nutriProfile: normalizeNutriProfile(data.nutri_profile),
-          nutriConfigured: data.nutri_configured,
-        };
-        setDietPlan(plan);
-        writeJson(planKey, plan);
-      })
-      .catch(console.error);
-    return () => { alive = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+    if (!hasSupabase || !userId) {
+      const cachedProfile = readJson<DietProfileRow | null>(nutriStorageKey, null);
+      if (cachedProfile) {
+        setNutriProfile({ ...emptyProfile(), ...cachedProfile });
+        setNutriSaved(true);
+        setActivePath('ia_nutri');
+        setNutriStep('confirm');
+      }
+      const cached = readJson(waterStorageKey, 0) as number;
+      setConsumedMl(cached);
+      setLoading(false);
+      return;
+    }
 
-  // carregar ai_additions
-  useEffect(() => {
-    if (!hasSupabase || !userId) { setAiAdditions([]); return; }
     let alive = true;
-    void supabase
-      .from('diet_ai_additions')
-      .select('id, meal_type, title, note, rationale')
-      .eq('user_id', userId).eq('date', selectedDate).eq('dismissed', false)
-      .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
+    setLoading(true);
+
+    void (async () => {
+      try {
+        const [dietProfileData, docData, mealsData, waterData, latestLog] = await Promise.all([
+          loadDietProfile(userId),
+          loadActiveDietDocument(userId),
+          loadDietMeals(userId),
+          loadWaterDaily(userId, selectedDate),
+          loadLatestNutritionAiLog(userId),
+        ]);
+
         if (!alive) return;
-        setAiAdditions(error ? [] : (data ?? []) as DietAiAddition[]);
-      });
-    return () => { alive = false; };
-  }, [selectedDate, userId]);
 
-  // busca Open Food Facts com debounce
+        if (dietProfileData) {
+          setNutriProfile({ ...emptyProfile(), ...dietProfileData });
+          setNutriSaved(true);
+        }
+        if (docData) {
+          setPdfDoc(docData);
+          const signed = await getSignedDietUrl(docData.file_path);
+          if (alive) setPdfSignedUrl(signed);
+        }
+        if (mealsData.length > 0) {
+          setMeals(mealsData);
+          const foodsMap: Record<string, DietFoodRow[]> = {};
+          await Promise.all(mealsData.map(async (m) => {
+            const foods = await loadDietFoods(userId, m.id);
+            foodsMap[m.id] = foods;
+          }));
+          if (alive) setFoodsByMeal(foodsMap);
+        }
+        if (waterData) {
+          setConsumedMl(waterData.consumed_ml);
+          setTargetMl(waterData.target_ml);
+        } else {
+          const cached = readJson(waterStorageKey, 0) as number;
+          if (alive) setConsumedMl(cached);
+        }
+        if (latestLog) {
+          setAiResult(latestLog.response);
+          setNutriStep('result');
+        }
+
+        // Determina caminho ativo
+        if (alive) {
+          if (docData) setActivePath('dietbox');
+          else if (mealsData.length > 0) setActivePath('manual');
+          else if (dietProfileData && latestLog) setActivePath('ia_nutri');
+          else if (dietProfileData) { setActivePath('ia_nutri'); setNutriStep('confirm'); }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedDate]);
+
+  const dateLabel = relativeDateLabel(selectedDate);
+  const hasMeals = meals.length > 0;
+  const hasFoods = Object.values(foodsByMeal).some((f) => f.length > 0);
+  const dayTotals = calcDayTotals(meals);
+  const nutritionTargets = estimateNutritionTargets({
+    weightKg: nutriProfile.weight_kg,
+    goal: nutriProfile.goal,
+    objectiveDetails: nutriProfile.objective_details,
+  });
+  const targetCalories = nutritionTargets?.calories;
+  const dayStatus = calcDayStatus({
+    hasMeals, hasFoods,
+    consumedCalories: dayTotals.calories,
+    targetCalories,
+    consumedWaterMl: consumedMl,
+    targetWaterMl: targetMl,
+  });
+
+  // ── Água ─────────────────────────────────────────────────────────────────
+
+  const handleAddWater = useCallback(async (ml: number) => {
+    const next = addWaterMl(consumedMl, ml);
+    setConsumedMl(next);
+    writeJson(waterStorageKey, next);
+    if (hasSupabase && userId) {
+      try { await saveWaterDaily(userId, selectedDate, next, targetMl); }
+      catch { showToast('não foi possível salvar a água.'); }
+    }
+  }, [consumedMl, targetMl, selectedDate, userId, waterStorageKey, showToast]);
+
+  const handleSetTarget = useCallback(async (ml: number) => {
+    setTargetMl(ml);
+    if (hasSupabase && userId) {
+      try { await saveWaterDaily(userId, selectedDate, consumedMl, ml); }
+      catch { showToast('não foi possível salvar a meta de água.'); }
+    }
+  }, [consumedMl, selectedDate, userId, showToast]);
+
+  // ── IA NUTRI ──────────────────────────────────────────────────────────────
+
+  const setNutriField = <K extends keyof DietProfileRow>(key: K, value: DietProfileRow[K]) => {
+    setNutriProfile((p) => ({ ...p, [key]: value, _dirty: true }));
+  };
+
+  const handleSaveNutriProfile = async () => {
+    if (!nutriProfile.goal || !nutriProfile.activity_level) {
+      showToast('informe objetivo e nível de atividade.'); return;
+    }
+    if (!hasSupabase || !userId) {
+      writeJson(nutriStorageKey, nutriProfile);
+      setNutriSaved(true); setNutriStep('confirm'); return;
+    }
+    try {
+      await saveDietProfile(userId, nutriProfile);
+      setNutriSaved(true);
+      setNutriStep('confirm');
+      showToast('perfil nutricional salvo.');
+    } catch (err) {
+      console.error('save diet profile', err);
+      showToast('não foi possível salvar o perfil.');
+    }
+  };
+
+  const handleGenerateNutri = async () => {
+    if (!userId) return;
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke<{ response?: string; error?: string }>('ia-nutri', {
+        body: { date: selectedDate },
+      });
+      if (error) throw error;
+      if (data?.error) { showToast(data.error); return; }
+      setAiResult(data?.response ?? null);
+      setNutriStep('result');
+    } catch (err) {
+      console.error('generate ia-nutri', err);
+      showToast('não foi possível gerar orientação. Verifique se a função ia-nutri está publicada.');
+    }
+    finally { setAiLoading(false); }
+  };
+
+  // ── DietBox PDF ───────────────────────────────────────────────────────────
+
+  const handlePdfUpload = async (file: File) => {
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('envie um arquivo PDF.'); return;
+    }
+    if (!userId) return;
+    setPdfUploading(true);
+    try {
+      const filePath = await uploadImageOrPreview({ bucket: 'diet', userId, file, prefix: 'dietbox' });
+      const doc = await saveDietDocument(userId, {
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: 'application/pdf',
+        source: 'dietbox_pdf',
+        status: 'active',
+      });
+      setPdfDoc(doc);
+      const signed = await getSignedDietUrl(filePath);
+      setPdfSignedUrl(signed);
+      showToast('PDF da dieta salvo.');
+    } catch { showToast('não foi possível enviar o PDF.'); }
+    finally { setPdfUploading(false); }
+  };
+
+  const handleRemovePdf = async () => {
+    if (!pdfDoc || !userId) return;
+    try {
+      await archiveDietDocument(userId, pdfDoc.id);
+      setPdfDoc(null); setPdfSignedUrl(null);
+      showToast('PDF removido.');
+    } catch { showToast('não foi possível remover o PDF.'); }
+  };
+
+  // ── Dieta manual ──────────────────────────────────────────────────────────
+
+  const handleAddMeal = async () => {
+    if (!addingMealName.trim()) { showToast('informe o nome da refeição.'); return; }
+    if (!userId) return;
+    try {
+      const newMeal = await saveDietMeal(userId, {
+        name: addingMealName.trim(), position: meals.length,
+        total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0,
+      });
+      setMeals((prev) => [...prev, newMeal]);
+      setFoodsByMeal((prev) => ({ ...prev, [newMeal.id]: [] }));
+      setAddingMealName('');
+      showToast('refeição adicionada.');
+    } catch { showToast('não foi possível adicionar refeição.'); }
+  };
+
+  const handleRemoveMeal = async (mealId: string) => {
+    if (!userId) return;
+    try {
+      await deleteDietMeal(userId, mealId);
+      setMeals((prev) => prev.filter((m) => m.id !== mealId));
+      setFoodsByMeal((prev) => { const n = { ...prev }; delete n[mealId]; return n; });
+    } catch { showToast('não foi possível remover refeição.'); }
+  };
+
   const triggerSearch = useCallback((q: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     if (q.trim().length < 2) { setSearchResults([]); return; }
-    searchTimeout.current = setTimeout(async () => { // 280ms = rápido mas sem spam
+    searchTimeout.current = setTimeout(async () => {
       setSearching(true);
       const results = await searchFoods(q);
       setSearchResults(results);
@@ -342,600 +437,859 @@ export function Diet() {
     }, 280);
   }, []);
 
-  const handleSearchChange = (q: string) => {
+  const handleFoodSearchChange = (q: string) => {
     setSearchQuery(q);
-    setDraft((d) => ({ ...d, title: q }));
+    setFoodDraft((d) => ({ ...d, name: q }));
     triggerSearch(q);
   };
 
-  const selectProduct = (product: FoodProduct) => {
-    setDraft((d) => ({
-      ...d,
-      title: product.title,
-      brand: product.brand,
-      serving_g: product.serving_g,
-      quantity_g: product.serving_g,
-      macros_per_100g: product.macros_per_100g,
+  const selectSearchProduct = (p: SearchProduct) => {
+    const ratio = foodDraft.quantity / 100;
+    setFoodDraft((d) => ({
+      ...d, name: p.title,
+      calories: Math.round(p.kcal_per_100g * ratio),
+      protein: Math.round(p.protein_per_100g * ratio * 10) / 10,
+      carbs: Math.round(p.carbs_per_100g * ratio * 10) / 10,
+      fat: Math.round(p.fat_per_100g * ratio * 10) / 10,
     }));
-    setSearchQuery(product.title);
+    setSearchQuery(p.title);
     setSearchResults([]);
   };
 
-  const setDraftField = <K extends keyof Omit<ManualFood, 'id'>>(
-    key: K,
-    value: Omit<ManualFood, 'id'>[K],
-  ) => setDraft((d) => ({ ...d, [key]: value }));
-
-  const setMacroField = (key: keyof Macros, value: string) => {
-    setDraft((d) => ({
-      ...d,
-      macros_per_100g: { ...d.macros_per_100g, [key]: Number(value) || 0 },
-    }));
-  };
-
-  const addFood = () => {
-    if (!draft.title.trim()) { showToast('informe o alimento.'); return; }
-    if (!draft.meal_type) { showToast('escolha a refeição.'); return; }
-    setDietPlan((current) => ({
-      ...current,
-      manualFoods: [
-        { id: crypto.randomUUID(), ...draft },
-        ...current.manualFoods,
-      ],
-    }));
-    setDraft(emptyDraft());
-    setSearchQuery('');
-    setSearchResults([]);
-    setShowFoodForm(false);
-    showToast('alimento adicionado.');
-  };
-
-  const removeFood = (id: string) => {
-    setDietPlan((current) => ({
-      ...current,
-      manualFoods: current.manualFoods.filter((f) => f.id !== id),
-    }));
-  };
-
-  const resetDietPlan = async () => {
-    setDietPlan(initialPlan);
-    if (!hasSupabase || !userId) return;
-    const { error } = await supabase.from('diet_plans').delete().eq('user_id', userId);
-    if (error) console.error(error);
-    showToast('plano de dieta resetado.');
-  };
-
-  const setNutriField = <K extends keyof NutriProfile>(key: K, value: NutriProfile[K]) => {
-    setDietPlan((current) => ({ ...current, nutriProfile: { ...current.nutriProfile, [key]: value } }));
-  };
-
-  const saveNutriProfile = () => {
-    const p = dietPlan.nutriProfile;
-    if (!p.objective || !p.activityLevel || !p.mealRoutine || !p.restrictions) {
-      showToast('preencha objetivo, atividade, rotina alimentar e restrições.');
-      return;
-    }
-    setDietPlan((current) => ({ ...current, setupMode: 'needs_ai_nutri', nutriConfigured: true }));
-    showToast('IA Nutri configurado.');
-  };
-
-  const dismissAiAddition = async (id: string) => {
-    setAiAdditions((current) => current.filter((a) => a.id !== id));
-    if (!hasSupabase || !userId) return;
-    const { error } = await supabase.from('diet_ai_additions').update({ dismissed: true }).eq('id', id).eq('user_id', userId);
-    if (error) showToast('não consegui dispensar a sugestão.');
-  };
-
-  const updateMeal = (mealId: string, patch: Partial<MealState>) => {
-    setDiet((current) => {
-      const meal = current.meals[mealId] ?? { variant: getDefaultMealVariant(mealId, selectedDate), checks: {} };
-      return { ...current, meals: { ...current.meals, [mealId]: { ...meal, ...patch } } };
-    });
-  };
-
-  const toggleItem = (mealId: string, index: number) => {
-    const current = diet.meals[mealId] ?? { variant: getDefaultMealVariant(mealId, selectedDate), checks: {} };
-    updateMeal(mealId, { checks: { ...current.checks, [index]: !current.checks[index] } });
-  };
-
-  const markMeal = (mealId: string, total: number) => {
-    updateMeal(mealId, { checks: Object.fromEntries(Array.from({ length: total }, (_, i) => [i, true])) });
-  };
-
-  const handleMealPhoto = async (mealId: string, file: File) => {
+  const handleAddFood = async (mealId: string) => {
+    if (!foodDraft.name.trim()) { showToast('informe o alimento.'); return; }
+    if (!userId) return;
     try {
-      const photoUrl = await uploadImageOrPreview({ bucket: 'meals', userId, file, prefix: `meal-${selectedDate}-${mealId}` });
-      updateMeal(mealId, { photoUrl });
-    } catch { showToast('não foi possível enviar a foto.'); }
+      const newFood = await saveDietFood(userId, {
+        diet_meal_id: mealId,
+        name: foodDraft.name,
+        quantity: foodDraft.quantity,
+        unit: foodDraft.unit,
+        calories: foodDraft.calories,
+        protein: foodDraft.protein,
+        carbs: foodDraft.carbs,
+        fat: foodDraft.fat,
+        notes: foodDraft.notes || null,
+        position: (foodsByMeal[mealId] ?? []).length,
+      } as Parameters<typeof saveDietFood>[1]);
+
+      const updatedFoods = [...(foodsByMeal[mealId] ?? []), newFood];
+      const totals = calcMealTotals(updatedFoods);
+      setFoodsByMeal((prev) => ({ ...prev, [mealId]: updatedFoods }));
+      setMeals((prev) => prev.map((m) =>
+        m.id === mealId
+          ? { ...m, total_calories: totals.calories, total_protein: totals.protein, total_carbs: totals.carbs, total_fat: totals.fat }
+          : m
+      ));
+
+      await updateMealTotals(userId, mealId, totals);
+
+      setFoodDraft(emptyFoodDraft());
+      setSearchQuery('');
+      setSearchResults([]);
+      setEditingFoodMealId(null);
+      showToast('alimento adicionado.');
+    } catch { showToast('não foi possível adicionar alimento.'); }
   };
 
-  const handleDietPdf = async (file: File) => {
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      showToast('envie um PDF da dieta.'); return;
-    }
+  const handleRemoveFood = async (mealId: string, foodId: string) => {
+    if (!userId) return;
     try {
-      const pdfUrl = await uploadImageOrPreview({ bucket: 'diet', userId, file, prefix: 'diet-plan' });
-      setDietPlan((current) => ({ ...current, pdfUrl, pdfName: file.name }));
-      showToast('PDF da dieta salvo.');
-    } catch { showToast('não foi possível enviar o PDF.'); }
+      await deleteDietFood(userId, foodId);
+      const updatedFoods = (foodsByMeal[mealId] ?? []).filter((f) => f.id !== foodId);
+      const totals = calcMealTotals(updatedFoods);
+      setFoodsByMeal((prev) => ({ ...prev, [mealId]: updatedFoods }));
+      setMeals((prev) => prev.map((m) =>
+        m.id === mealId
+          ? { ...m, total_calories: totals.calories, total_protein: totals.protein, total_carbs: totals.carbs, total_fat: totals.fat }
+          : m
+      ));
+      await updateMealTotals(userId, mealId, totals);
+    } catch { showToast('não foi possível remover alimento.'); }
   };
 
-  useAutoSave(diet, async () => {
-    if (!hasSupabase || !userId) return;
-    try {
-      for (const meal of MEALS) {
-        const state = diet.meals[meal.id];
-        if (!state) continue;
-        const items = meal.variants[state.variant] ?? meal.variants.principal;
-        const checked = items.filter((_, i) => state.checks[i]).map((item) => item.title);
-        if (!checked.length && !state.photoUrl) continue;
-        await saveMealLog(userId, selectedDate, {
-          meal_type: meal.mealType,
-          ingredients: checked,
-          photo_url: state.photoUrl ?? null,
-          notes: `${meal.title} · ${state.variant}`,
-        });
-      }
-    } catch { showToast('não foi possível salvar a dieta.'); }
-  });
+  // ── Render ────────────────────────────────────────────────────────────────
 
-  useAutoSave(dietPlan, async () => {
-    if (!hasSupabase || !userId) return;
-    try {
-      await saveDietPlan(userId, {
-        manual_foods: dietPlan.manualFoods,
-        pdf_url: dietPlan.pdfUrl,
-        pdf_name: dietPlan.pdfName,
-        notes: dietPlan.notes || null,
-        setup_mode: dietPlan.setupMode,
-        nutri_profile: dietPlan.nutriProfile as unknown as Record<string, unknown>,
-        nutri_configured: dietPlan.nutriConfigured,
-      });
-    } catch { showToast('não foi possível salvar o plano de dieta.'); }
-  });
-
-  const generalAiAdditions = aiAdditions.filter((a) => !a.meal_type);
-
-  // agrupar foods por refeição
-  const foodsByMeal = MEAL_ORDER.reduce<Record<string, ManualFood[]>>((acc, mt) => {
-    acc[mt] = dietPlan.manualFoods.filter((f) => f.meal_type === mt);
-    return acc;
-  }, {});
+  if (loading) {
+    return (
+      <div className="screen stack-md">
+        <header className="stack">
+          <span className="eyebrow">dieta · {dateLabel}</span>
+          <h1 className="t-display-lg">Comer com <em className="t-display-italic">presença.</em></h1>
+        </header>
+        <p className="t-body muted">carregando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="screen stack-md">
       <header className="stack">
         <span className="eyebrow">dieta · {dateLabel}</span>
         <h1 className="t-display-lg">Comer com <em className="t-display-italic">presença.</em></h1>
-        <p className="t-body muted">Plano do dia com substituições, água e foto da refeição.</p>
+        <p className="t-body muted">Organize sua alimentação com ciência e presença.</p>
       </header>
 
       <CyclePhaseBanner context="diet" date={selectedDate} />
 
-      {/* ── configuração inicial ── */}
-      {!dietPlan.setupMode && (
-        <section className="card diet-plan-card stack">
-          <span className="eyebrow">configuração inicial</span>
-          <h2 className="t-title">Você já possui uma dieta?</h2>
-          <div className="inline-actions">
-            <button className="btn btn--primary" onClick={() => setDietPlan((c) => ({ ...c, setupMode: 'existing_plan' }))}>
-              já possuo
+      {/* ── Estado inicial: três caminhos ─────────────────────────────────── */}
+      {!activePath && (
+        <section className="card stack" data-testid="diet-path-selection">
+          <span className="eyebrow">como quer começar?</span>
+          <h2 className="t-title">Organize sua dieta</h2>
+          <p className="t-body-sm muted">Escolha uma das três formas de acompanhar sua alimentação.</p>
+          <div className="diet-path-grid">
+            <button
+              className="diet-path-card"
+              onClick={() => setActivePath('ia_nutri')}
+              data-testid="path-ia-nutri"
+            >
+              <span className="diet-path-card__icon">IA</span>
+              <strong>Apoio da IA NUTRI</strong>
+              <small>Preencha seu perfil e receba orientações personalizadas baseadas em evidência.</small>
             </button>
-            <button className="btn btn--secondary" onClick={() => setDietPlan((c) => ({ ...c, setupMode: 'needs_ai_nutri' }))}>
-              configurar IA Nutri
+            <button
+              className="diet-path-card"
+              onClick={() => setActivePath('dietbox')}
+              data-testid="path-dietbox"
+            >
+              <span className="diet-path-card__icon">PDF</span>
+              <strong>Enviar dieta DietBox</strong>
+              <small>Faça upload do PDF da sua dieta e acompanhe aqui.</small>
+            </button>
+            <button
+              className="diet-path-card"
+              onClick={() => setActivePath('manual')}
+              data-testid="path-manual"
+            >
+              <span className="diet-path-card__icon">+</span>
+              <strong>Criar dieta manual</strong>
+              <small>Cadastre refeições e alimentos com calorias e macros.</small>
             </button>
           </div>
         </section>
       )}
 
-      {dietPlan.setupMode && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn--secondary btn--sm" onClick={() => void resetDietPlan()}>
-            resetar plano de dieta
+      {activePath && (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn btn--secondary btn--sm" onClick={() => setActivePath(null)}>
+            trocar caminho
           </button>
         </div>
       )}
 
-      {/* ── formulário IA Nutri ── */}
-      {dietPlan.setupMode === 'needs_ai_nutri' && !dietPlan.nutriConfigured && (
-        <section className="card diet-plan-card stack">
-          <div className="row-between">
-            <span className="eyebrow">IA Nutri</span>
-            <span className="t-body-sm muted">perfil nutricional</span>
-          </div>
-          <p className="t-body-sm muted">Preencha o essencial para a IA montar uma estratégia alimentar coerente com saúde, treino, rotina e restrições.</p>
-          <div className="diet-nutri-grid">
-            <select className="field" value={dietPlan.nutriProfile.objective} onChange={(e) => setNutriField('objective', e.target.value)}>
-              <option value="">objetivo principal</option>
+      {/* ── Painel diário (quando há dados) ─────────────────────────────────── */}
+      {activePath && (hasMeals || consumedMl > 0) && (
+        <DailyPanel
+          dayTotals={dayTotals}
+          consumedMl={consumedMl}
+          targetMl={targetMl}
+          dayStatus={dayStatus}
+          targetCalories={targetCalories}
+        />
+      )}
+
+      {/* ── IA NUTRI ─────────────────────────────────────────────────────── */}
+      {activePath === 'ia_nutri' && (
+        <WaterSection
+          consumedMl={consumedMl}
+          targetMl={targetMl}
+          onAdd={handleAddWater}
+          onTargetChange={handleSetTarget}
+        />
+      )}
+
+      {activePath === 'ia_nutri' && (
+        <NutriSection
+          profile={nutriProfile}
+          saved={nutriSaved}
+          step={nutriStep}
+          aiResult={aiResult}
+          aiLoading={aiLoading}
+          nutritionTargets={nutritionTargets}
+          setField={setNutriField}
+          onSave={handleSaveNutriProfile}
+          onEdit={() => setNutriStep('form')}
+          onGenerate={() => void handleGenerateNutri()}
+          onOpenLabs={() => goTo('labs')}
+        />
+      )}
+
+      {/* ── DietBox PDF ──────────────────────────────────────────────────── */}
+      {activePath === 'dietbox' && (
+        <DietboxSection
+          pdfDoc={pdfDoc}
+          pdfSignedUrl={pdfSignedUrl}
+          uploading={pdfUploading}
+          onUpload={handlePdfUpload}
+          onRemove={() => void handleRemovePdf()}
+        />
+      )}
+
+      {/* ── Dieta manual ─────────────────────────────────────────────────── */}
+      {activePath === 'manual' && (
+        <ManualDietSection
+          meals={meals}
+          foodsByMeal={foodsByMeal}
+          addingMealName={addingMealName}
+          editingFoodMealId={editingFoodMealId}
+          foodDraft={foodDraft}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          searching={searching}
+          onAddingMealNameChange={setAddingMealName}
+          onAddMeal={() => void handleAddMeal()}
+          onRemoveMeal={(id) => void handleRemoveMeal(id)}
+          onAddFoodToggle={(id) => {
+            setEditingFoodMealId((prev) => (prev === id ? null : id));
+            setFoodDraft(emptyFoodDraft());
+            setSearchQuery('');
+            setSearchResults([]);
+          }}
+          onFoodSearchChange={handleFoodSearchChange}
+          onSelectProduct={selectSearchProduct}
+          onFoodDraftChange={(patch) => setFoodDraft((d) => ({ ...d, ...patch }))}
+          onAddFood={(mealId) => void handleAddFood(mealId)}
+          onRemoveFood={(mealId, foodId) => void handleRemoveFood(mealId, foodId)}
+        />
+      )}
+
+      {/* ── Água (sempre visível quando há caminho ativo) ────────────────── */}
+      {activePath && activePath !== 'ia_nutri' && (
+        <WaterSection
+          consumedMl={consumedMl}
+          targetMl={targetMl}
+          onAdd={handleAddWater}
+          onTargetChange={handleSetTarget}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Sub-seção: Painel diário ──────────────────────────────────────────────────
+
+function DailyPanel({ dayTotals, consumedMl, targetMl, dayStatus, targetCalories }: {
+  dayTotals: ReturnType<typeof calcDayTotals>;
+  consumedMl: number;
+  targetMl: number;
+  dayStatus: DayStatus;
+  targetCalories?: number;
+}) {
+  const waterPct = waterProgressPct(consumedMl, targetMl);
+  return (
+    <section className="card diet-daily-panel" data-testid="daily-panel">
+      <div className="row-between">
+        <span className="eyebrow">painel do dia</span>
+        <span className={`diet-status-pill diet-status-pill--${dayStatus}`}>
+          {DAY_STATUS_LABELS[dayStatus]}
+        </span>
+      </div>
+      <div className="diet-totals-grid">
+        <MacroChip label="kcal" value={String(dayTotals.calories)} highlight sub={targetCalories ? `meta: ${targetCalories}` : undefined} />
+        <MacroChip label="prot" value={`${dayTotals.protein}g`} />
+        <MacroChip label="carbo" value={`${dayTotals.carbs}g`} />
+        <MacroChip label="gord" value={`${dayTotals.fat}g`} />
+      </div>
+      <div className="diet-water-mini">
+        <span className="t-body-sm muted">água: {(consumedMl / 1000).toFixed(1).replace('.', ',')}L de {(targetMl / 1000).toFixed(1).replace('.', ',')}L</span>
+        <div className="diet-water-bar">
+          <div className="diet-water-bar__fill" style={{ width: `${waterPct}%` }} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Sub-seção: IA NUTRI ───────────────────────────────────────────────────────
+
+function NutriSection({ profile, saved, step, aiResult, aiLoading, nutritionTargets, setField, onSave, onEdit, onGenerate, onOpenLabs }: {
+  profile: DietProfileRow;
+  saved: boolean;
+  step: 'form' | 'confirm' | 'result';
+  aiResult: string | null;
+  aiLoading: boolean;
+  nutritionTargets: NutritionTargets | null;
+  setField: <K extends keyof DietProfileRow>(key: K, value: DietProfileRow[K]) => void;
+  onSave: () => void;
+  onEdit: () => void;
+  onGenerate: () => void;
+  onOpenLabs: () => void;
+}) {
+  if (step === 'result' && aiResult) {
+    return (
+      <section className="card stack" data-testid="nutri-result">
+        <div className="row-between">
+          <span className="eyebrow">IA NUTRI · orientação</span>
+          <button className="btn btn--secondary btn--sm" onClick={onEdit}>editar perfil</button>
+        </div>
+        <div className="diet-ai-response">
+          {aiResult.split('\n').map((line, i) => (
+            line.trim() ? <p key={i} className="t-body-sm">{line}</p> : <br key={i} />
+          ))}
+        </div>
+        <button className="btn btn--secondary btn--sm" onClick={onGenerate} disabled={aiLoading}>
+          {aiLoading ? 'gerando...' : 'gerar nova orientação'}
+        </button>
+      </section>
+    );
+  }
+
+  if (step === 'confirm') {
+    return (
+      <section className="card stack" data-testid="nutri-confirm">
+        <span className="eyebrow">IA NUTRI · pronto para gerar</span>
+        <p className="t-body-sm muted">Seu perfil nutricional está salvo. Revise os dados antes de gerar a orientação.</p>
+        <div className="diet-nutri-summary">
+          {profile.goal && <span><strong>Objetivo:</strong> {profile.goal}</span>}
+          {profile.weight_kg && <span><strong>Peso informado:</strong> {profile.weight_kg}kg</span>}
+          {profile.activity_level && <span><strong>Atividade:</strong> {profile.activity_level}</span>}
+          {profile.dietary_restrictions && <span><strong>Restrições:</strong> {profile.dietary_restrictions}</span>}
+        </div>
+        {nutritionTargets && (
+          <NutritionTargetPreview targets={nutritionTargets} />
+        )}
+        <div className="inline-actions">
+          <button className="btn btn--primary" onClick={onGenerate} disabled={aiLoading} data-testid="btn-generate-nutri">
+            {aiLoading ? 'gerando orientação...' : 'gerar orientação da IA NUTRI'}
+          </button>
+          <button className="btn btn--secondary btn--sm" onClick={onEdit}>editar perfil</button>
+        </div>
+        {aiLoading && <p className="t-body-sm muted">analisando seu perfil com base em evidências nutricionais...</p>}
+      </section>
+    );
+  }
+
+  return (
+    <section className="card stack" data-testid="nutri-form">
+      <div className="row-between">
+        <span className="eyebrow">IA NUTRI · perfil nutricional</span>
+        {saved && <button className="btn btn--secondary btn--sm" onClick={onEdit}>cancelar</button>}
+      </div>
+      <p className="t-body-sm muted">Preencha para receber orientações personalizadas. A IA NUTRI usa ciência da nutrição, não modismos.</p>
+
+      <div className="diet-nutri-grid">
+        <div>
+          <label className="diet-field-label"><span>objetivo principal</span>
+            <select className="field" value={profile.goal ?? ''} onChange={(e) => setField('goal', e.target.value)}>
+              <option value="">selecione</option>
               <option value="saude_geral">saúde geral</option>
-              <option value="energia">mais energia no dia a dia</option>
+              <option value="energia">mais energia</option>
               <option value="performance">performance esportiva</option>
-              <option value="composicao">composição corporal sustentável</option>
+              <option value="composicao">composição corporal</option>
               <option value="longevidade">longevidade</option>
               <option value="condicao_especifica">condição específica</option>
             </select>
-            <select className="field" value={dietPlan.nutriProfile.activityLevel} onChange={(e) => setNutriField('activityLevel', e.target.value)}>
-              <option value="">nível de atividade</option>
+          </label>
+        </div>
+      </div>
+      <NutriTextarea label="Complemento do objetivo" value={profile.objective_details ?? ''}
+        onChange={(v) => setField('objective_details', v)} placeholder="ex: perder gordura preservando massa, ganhar massa, melhorar energia no treino..." />
+      <div className="diet-nutri-grid">
+        <div>
+          <label className="diet-field-label"><span>nível de atividade</span>
+            <select className="field" value={profile.activity_level ?? ''} onChange={(e) => setField('activity_level', e.target.value)}>
+              <option value="">selecione</option>
               <option value="sedentario">sedentário</option>
               <option value="recreativo">ativo recreativo</option>
               <option value="treina_regular">treina regularmente</option>
               <option value="atleta">atleta / alto volume</option>
             </select>
-            <select className="field" value={dietPlan.nutriProfile.budget} onChange={(e) => setNutriField('budget', e.target.value)}>
-              <option value="">orçamento</option>
+          </label>
+        </div>
+        <div>
+          <label className="diet-field-label"><span>peso (kg)</span>
+            <input className="field" type="number" min={30} max={300} step={0.1}
+              value={profile.weight_kg ?? ''} onChange={(e) => setField('weight_kg', e.target.value ? Number(e.target.value) : undefined)} />
+          </label>
+        </div>
+        <div>
+          <label className="diet-field-label"><span>altura (cm)</span>
+            <input className="field" type="number" min={100} max={250}
+              value={profile.height_cm ?? ''} onChange={(e) => setField('height_cm', e.target.value ? Number(e.target.value) : undefined)} />
+          </label>
+        </div>
+        <div>
+          <label className="diet-field-label"><span>idade</span>
+            <input className="field" type="number" min={10} max={110}
+              value={profile.age ?? ''} onChange={(e) => setField('age', e.target.value ? Number(e.target.value) : undefined)} />
+          </label>
+        </div>
+        <div>
+          <label className="diet-field-label"><span>orçamento</span>
+            <select className="field" value={profile.budget ?? ''} onChange={(e) => setField('budget', e.target.value)}>
+              <option value="">selecione</option>
               <option value="baixo">baixo</option>
               <option value="medio">médio</option>
               <option value="alto">alto</option>
               <option value="flexivel">flexível</option>
             </select>
-            <select className="field" value={dietPlan.nutriProfile.cookingSkill} onChange={(e) => setNutriField('cookingSkill', e.target.value)}>
-              <option value="">cozinha</option>
-              <option value="nao_cozinha">não cozinha</option>
-              <option value="basico">básico</option>
-              <option value="intermediario">intermediário</option>
-              <option value="avancado">avançado</option>
-            </select>
-          </div>
-          <NutriTextarea label="Detalhe o objetivo" value={dietPlan.nutriProfile.objectiveDetails} onChange={(v) => setNutriField('objectiveDetails', v)} placeholder="ex: melhorar energia à tarde, ganhar massa sem piorar digestão..." />
-          <NutriTextarea label="Treino e volume semanal" value={dietPlan.nutriProfile.trainingRoutine} onChange={(v) => setNutriField('trainingRoutine', v)} placeholder="modalidade, dias, duração, intensidade..." />
-          <NutriTextarea label="Contexto de saúde" value={dietPlan.nutriProfile.healthContext} onChange={(v) => setNutriField('healthContext', v)} placeholder="condições, sintomas, histórico clínico relevante..." />
-          <div className="diet-nutri-grid">
-            <NutriTextarea label="Medicamentos" value={dietPlan.nutriProfile.medications} onChange={(v) => setNutriField('medications', v)} placeholder="medicações ou suplementos atuais..." />
-            <NutriTextarea label="Exames recentes" value={dietPlan.nutriProfile.exams} onChange={(v) => setNutriField('exams', v)} placeholder="ferritina, vitamina D, B12, glicemia..." />
-          </div>
-          {(sexo === 'feminino' || sexo === 'outro' || profile?.cycle_tracking) && (
-            <NutriTextarea label="Ciclo, gestação ou amamentação" value={dietPlan.nutriProfile.pregnancyContext} onChange={(v) => setNutriField('pregnancyContext', v)} placeholder="fase do ciclo, irregularidades, gestação..." />
-          )}
-          <NutriTextarea label="Rotina alimentar praticável" value={dietPlan.nutriProfile.mealRoutine} onChange={(v) => setNutriField('mealRoutine', v)} placeholder="horários, número de refeições, refeições fora..." />
-          <NutriTextarea label="Restrições e intolerâncias" value={dietPlan.nutriProfile.restrictions} onChange={(v) => setNutriField('restrictions', v)} placeholder="alergias, intolerâncias, vegetarianismo..." />
-          <NutriTextarea label="Preferências e aversões" value={dietPlan.nutriProfile.preferences} onChange={(v) => setNutriField('preferences', v)} placeholder="alimentos que gosta, não gosta, praticidade..." />
-          <div className="diet-nutri-grid">
-            <NutriTextarea label="Histórico de dietas" value={dietPlan.nutriProfile.dietHistory} onChange={(v) => setNutriField('dietHistory', v)} placeholder="o que já tentou, o que funcionou..." />
-            <NutriTextarea label="Fome, saciedade e energia" value={dietPlan.nutriProfile.appetiteAndEnergy} onChange={(v) => setNutriField('appetiteAndEnergy', v)} placeholder="fome à noite, compulsão, energia baixa..." />
-          </div>
-          <button className="btn btn--primary" onClick={saveNutriProfile}>salvar perfil do IA Nutri</button>
-        </section>
-      )}
-
-      {dietPlan.setupMode === 'needs_ai_nutri' && dietPlan.nutriConfigured && (
-        <section className="diet-ai-card stack">
-          <div className="row-between">
-            <span className="eyebrow">IA Nutri configurado</span>
-            <button className="btn btn--secondary btn--sm" onClick={() => setDietPlan((c) => ({ ...c, nutriConfigured: false }))}>
-              editar formulário
-            </button>
-          </div>
-          <p className="t-body-sm muted">O chat na dimensão Dieta usa seu perfil nutricional para orientar estratégia alimentar com racional técnico.</p>
-        </section>
-      )}
-
-      {/* ── painel de totais ── */}
-      {dietPlan.setupMode && dietPlan.manualFoods.length > 0 && (
-        <section className="diet-totals-card">
-          <span className="eyebrow">totais do plano</span>
-          <div className="diet-totals-grid">
-            <MacroChip label="kcal" value={String(totals.kcal)} highlight />
-            <MacroChip label="prot" value={`${totals.protein_g}g`} />
-            <MacroChip label="carbo" value={`${totals.carb_g}g`} />
-            <MacroChip label="gord" value={`${totals.fat_g}g`} />
-          </div>
-        </section>
-      )}
-
-      {/* ── plano alimentar manual ── */}
-      {(dietPlan.setupMode !== 'needs_ai_nutri' || dietPlan.nutriConfigured) && (
-        <section className="card diet-plan-card stack">
-          <div className="row-between">
-            <span className="eyebrow">{dietPlan.setupMode === 'existing_plan' ? 'sua dieta atual' : 'plano alimentar'}</span>
-            <button className="btn btn--primary btn--sm" onClick={() => setShowFoodForm((v) => !v)}>
-              {showFoodForm ? 'cancelar' : '+ alimento'}
-            </button>
-          </div>
-
-          <textarea
-            className="field"
-            rows={2}
-            placeholder="observações gerais, horários, orientação do nutri..."
-            value={dietPlan.notes}
-            onChange={(e) => setDietPlan((c) => ({ ...c, notes: e.target.value }))}
-          />
-
-          {/* ── formulário de alimento ── */}
-          {showFoodForm && (
-            <div className="diet-food-form stack">
-              <span className="eyebrow" style={{ color: 'var(--diet)' }}>novo alimento</span>
-
-              {/* busca */}
-              <div className="diet-search-wrap">
-                <input
-                  className="field"
-                  placeholder="buscar alimento (ex: banana, peito de frango...)"
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  autoComplete="off"
-                />
-                {searching && <span className="diet-search-loading">buscando...</span>}
-                {searchResults.length > 0 && (
-                  <ul className="diet-search-results">
-                    {searchResults.map((p) => (
-                      <li key={p.id}>
-                        <button className="diet-search-item" onClick={() => selectProduct(p)}>
-                          <span className="diet-search-item__name">{p.title}</span>
-                          {p.brand && <span className="diet-search-item__brand">{p.brand}</span>}
-                          <span className="diet-search-item__kcal">{Math.round(p.macros_per_100g.kcal * p.serving_g / 100)} kcal / {p.serving_g}g</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* refeição */}
-              <div className="diet-food-row">
-                <select
-                  className="field"
-                  value={draft.meal_type ?? ''}
-                  onChange={(e) => setDraftField('meal_type', e.target.value ? e.target.value as MealType : null)}
-                >
-                  <option value="">refeição</option>
-                  {MEAL_ORDER.map((mt) => (
-                    <option key={mt} value={mt}>{MEAL_LABELS[mt]}</option>
-                  ))}
-                </select>
-
-                {draft.meal_type && WORKOUT_MEAL_TYPES.includes(draft.meal_type) && (
-                  <select
-                    className="field"
-                    value={draft.workout_period ?? ''}
-                    onChange={(e) => setDraftField('workout_period', e.target.value ? e.target.value as WorkoutMealPeriod : null)}
-                  >
-                    <option value="">período</option>
-                    {(Object.keys(WORKOUT_PERIOD_LABELS) as WorkoutMealPeriod[]).map((p) => (
-                      <option key={p} value={p}>{WORKOUT_PERIOD_LABELS[p]}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* quantidade e porção */}
-              <div className="diet-food-row">
-                <label className="diet-field-label">
-                  <span>quantidade (g ou ml)</span>
-                  <input
-                    className="field"
-                    type="number"
-                    min={1}
-                    value={draft.quantity_g}
-                    onChange={(e) => setDraftField('quantity_g', Number(e.target.value) || 0)}
-                  />
-                </label>
-                <label className="diet-field-label">
-                  <span>porção de referência (g)</span>
-                  <input
-                    className="field"
-                    type="number"
-                    min={1}
-                    value={draft.serving_g}
-                    onChange={(e) => setDraftField('serving_g', Number(e.target.value) || 0)}
-                  />
-                </label>
-              </div>
-
-              {/* macros por 100g */}
-              <span className="t-body-sm muted">macros por 100g (preenchidos automaticamente pela busca)</span>
-              <div className="diet-macros-row">
-                <label className="diet-field-label">
-                  <span>kcal</span>
-                  <input className="field" type="number" min={0} value={draft.macros_per_100g.kcal} onChange={(e) => setMacroField('kcal', e.target.value)} />
-                </label>
-                <label className="diet-field-label">
-                  <span>prot (g)</span>
-                  <input className="field" type="number" min={0} step={0.1} value={draft.macros_per_100g.protein_g} onChange={(e) => setMacroField('protein_g', e.target.value)} />
-                </label>
-                <label className="diet-field-label">
-                  <span>carbo (g)</span>
-                  <input className="field" type="number" min={0} step={0.1} value={draft.macros_per_100g.carb_g} onChange={(e) => setMacroField('carb_g', e.target.value)} />
-                </label>
-                <label className="diet-field-label">
-                  <span>gord (g)</span>
-                  <input className="field" type="number" min={0} step={0.1} value={draft.macros_per_100g.fat_g} onChange={(e) => setMacroField('fat_g', e.target.value)} />
-                </label>
-              </div>
-
-              {/* preview dos macros calculados — sempre visível */}
-              {(() => {
-                const m = foodMacros({ ...draft, id: '' });
-                return (
-                  <div className="diet-macro-preview">
-                    <span><strong>{m.kcal}</strong> kcal</span>
-                    <span><strong>{m.protein_g}g</strong> prot</span>
-                    <span><strong>{m.carb_g}g</strong> carbo</span>
-                    <span><strong>{m.fat_g}g</strong> gord</span>
-                    <span className="diet-macro-preview__qty">em {draft.quantity_g}g</span>
-                  </div>
-                );
-              })()}
-
-              <div className="inline-actions">
-                <button className="btn btn--primary" onClick={addFood}>adicionar ao plano</button>
-                <label className="file-button file-button--quiet">
-                  enviar PDF
-                  <input type="file" accept="application/pdf,.pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleDietPdf(f); }} />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {dietPlan.pdfUrl && (
-            <a className="diet-pdf-link" href={dietPlan.pdfUrl} target="_blank" rel="noreferrer">
-              {dietPlan.pdfName ?? 'PDF da dieta'}
-            </a>
-          )}
-
-          {/* ── lista de alimentos agrupada por refeição ── */}
-          {MEAL_ORDER.map((mt) => {
-            const foods = foodsByMeal[mt] ?? [];
-            if (!foods.length) return null;
-            const mealTotal = totalMacros(foods);
-            return (
-              <div key={mt} className="diet-meal-group">
-                <div className="diet-meal-group__header">
-                  <span className="eyebrow">{MEAL_LABELS[mt]}</span>
-                  <span className="diet-meal-group__total">{mealTotal.kcal} kcal</span>
-                </div>
-                {foods.map((food) => {
-                  const m = foodMacros(food);
-                  return (
-                    <article key={food.id} className="diet-food-item">
-                      <div className="diet-food-item__info">
-                        <strong>{food.title}</strong>
-                        {food.brand && <small>{food.brand}</small>}
-                        <span className="diet-food-item__qty">{food.quantity_g}g</span>
-                      </div>
-                      <div className="diet-food-item__macros">
-                        <span className="diet-food-item__kcal">{m.kcal} kcal</span>
-                        <span>{m.protein_g}g P</span>
-                        <span>{m.carb_g}g C</span>
-                        <span>{m.fat_g}g G</span>
-                      </div>
-                      <CircleButton variant="close" ariaLabel="Remover alimento" onClick={() => removeFood(food.id)} />
-                    </article>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </section>
-      )}
-
-      {generalAiAdditions.length > 0 && (
-        <section className="diet-ai-card stack">
-          <span className="eyebrow">sugestões da IA coach</span>
-          {generalAiAdditions.map((a) => (
-            <AiAdditionRow key={a.id} addition={a} onDismiss={dismissAiAddition} />
-          ))}
-        </section>
-      )}
-
-      {/* ── água ── */}
-      <section className="card diet-water-card stack" style={{ '--dim': 'var(--diet)' } as CSSProperties}>
-        <span className="eyebrow">água e recuperação</span>
-        <div className="t-display-md">
-          {(diet.water * 0.5).toFixed(1).replace('.', ',')}L de {String(target).replace('.', ',')}L
+          </label>
         </div>
-        <div className="water-grid">
-          {Array.from({ length: Math.round(target / 0.5) }, (_, i) => (
+      </div>
+      {nutritionTargets && (
+        <NutritionTargetPreview targets={nutritionTargets} />
+      )}
+
+      <TrainingOptions profile={profile} setField={setField} />
+      <NutriTextarea label="Rotina alimentar praticável" value={profile.available_meal_times ?? ''}
+        onChange={(v) => setField('available_meal_times', v)} placeholder="horários, número de refeições, come fora..." />
+      <NutriTextarea label="Alimentos que gosta / evita" value={profile.liked_foods ?? ''}
+        onChange={(v) => setField('liked_foods', v)} placeholder="preferências e aversões alimentares..." />
+      <NutriTextarea label="Restrições, intolerâncias e alergias" value={profile.dietary_restrictions ?? ''}
+        onChange={(v) => setField('dietary_restrictions', v)} placeholder="lactose, glúten, vegetarianismo, alergias..." />
+      <NutriTextarea label="Sintomas digestivos" value={profile.digestive_symptoms ?? ''}
+        onChange={(v) => setField('digestive_symptoms', v)} placeholder="refluxo, gases, constipação, distensão..." />
+      <div className="diet-nutri-grid">
+        <NutriTextarea label="Medicamentos" value={profile.medications ?? ''}
+          onChange={(v) => setField('medications', v)} placeholder="medicações e suplementos atuais..." />
+        <ExamUploadShortcut onOpenLabs={onOpenLabs} />
+      </div>
+      <NutriTextarea label="Histórico de dietas" value={profile.diet_history ?? ''}
+        onChange={(v) => setField('diet_history', v)} placeholder="o que já tentou, o que funcionou..." />
+      <NutriTextarea label="Fome, saciedade e energia ao longo do dia" value={profile.appetite_and_energy ?? ''}
+        onChange={(v) => setField('appetite_and_energy', v)} placeholder="fome à noite, compulsão, energia baixa..." />
+
+      <button className="btn btn--primary" onClick={onSave} data-testid="btn-save-nutri">
+        salvar perfil
+      </button>
+    </section>
+  );
+}
+
+function TrainingOptions({ profile, setField }: {
+  profile: DietProfileRow;
+  setField: <K extends keyof DietProfileRow>(key: K, value: DietProfileRow[K]) => void;
+}) {
+  return (
+    <div className="diet-option-panel">
+      <span className="eyebrow">treino e refeições</span>
+      <div className="diet-option-block">
+        <span className="diet-field-label-text">frequência</span>
+        <div className="choice-row">
+          {TRAINING_FREQUENCY_OPTIONS.map((option) => (
             <button
-              key={i}
-              className={`btn btn--sm ${diet.water > i ? 'btn--light' : 'btn--outline-light'}`}
-              onClick={() => setDiet((c) => ({ ...c, water: i + 1 }))}
+              key={option.value}
+              className={`chip${profile.training_frequency === option.value ? ' chip--active' : ''}`}
+              onClick={() => setField('training_frequency', option.value)}
+              type="button"
             >
-              {((i + 1) * 0.5).toFixed(1).replace('.', ',')}L
+              {option.label}
             </button>
           ))}
         </div>
-      </section>
-
-      {/* ── panels de refeições do ritual ── */}
-      {dietPlan.setupMode && MEALS.map((meal) => {
-        const recommendedVariant = getDefaultMealVariant(meal.id, selectedDate);
-        const state = diet.meals[meal.id] ?? { variant: recommendedVariant, checks: {} };
-        const items = meal.variants[state.variant] ?? meal.variants.principal;
-        const done = items.filter((_, i) => state.checks[i]).length;
-        const mealAiAdditions = aiAdditions.filter((a) => a.meal_type === meal.mealType);
-
-        return (
-          <details
-            key={meal.id}
-            className="dimension-panel dimension-panel--diet card stack meal-panel"
-            style={{ '--panel-dim': 'var(--diet)' } as CSSProperties}
-          >
-            <summary>
-              <span>
-                <span className="eyebrow">{meal.title}</span>
-                <strong>{done ? `${done} escolhidos` : meal.time}</strong>
-              </span>
-              <button
-                className="panel-toggle"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const details = (e.currentTarget as HTMLElement).closest('details') as HTMLDetailsElement | null;
-                  if (details) details.open = !details.open;
-                }}
-                aria-label={'Abrir/fechar ' + meal.title}
-              >
-                <CircleButton ariaLabel={'Alternar ' + meal.title} color="var(--diet)" />
-              </button>
-            </summary>
-            <div className="dimension-panel-body">
-              <div className="row-between" style={{ alignItems: 'flex-start' }}>
-                <div>
-                  <h2 className="meal-title">{meal.title}</h2>
-                  <div className="t-body-sm muted">{meal.time}</div>
-                </div>
-                <span className="meal-pill">{Math.round((done / items.length) * 100) || 0}%</span>
-              </div>
-              <div className="chip-row">
-                {orderedMealVariants(meal.variants).map((variant) => (
-                  <button
-                    key={variant}
-                    className={`chip ${state.variant === variant ? 'chip--active' : ''}`}
-                    onClick={() => updateMeal(meal.id, { variant, checks: {} })}
-                  >
-                    {variant === 'principal' ? 'principal' : variant === recommendedVariant ? 'sugestão' : variant.replace('sub', 'sub ')}
-                  </button>
-                ))}
-              </div>
-              <div className="task-list">
-                {items.map((item, index) => (
-                  <button
-                    key={`${item.title}-${index}`}
-                    className={`task-row ${state.checks[index] ? 'task-row--done' : ''}`}
-                    onClick={() => toggleItem(meal.id, index)}
-                  >
-                    <span className="task-check">{state.checks[index] ? '✓' : ''}</span>
-                    <span>
-                      <strong>{item.title}</strong>
-                      {item.note && <small>{item.note}</small>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {mealAiAdditions.length > 0 && (
-                <div className="meal-ai-additions">
-                  {mealAiAdditions.map((a) => (
-                    <AiAdditionRow key={a.id} addition={a} onDismiss={dismissAiAddition} />
-                  ))}
-                </div>
-              )}
-              <div className="inline-actions">
-                <label className="file-button">
-                  foto da refeição
-                  <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleMealPhoto(meal.id, f); }} />
-                </label>
-                <button className="btn btn--secondary btn--sm" onClick={() => markMeal(meal.id, items.length)}>marcar tudo</button>
-              </div>
-              {state.photoUrl && <img className="photo-preview" src={state.photoUrl} alt={`Foto de ${meal.title}`} />}
-            </div>
-          </details>
-        );
-      })}
+      </div>
+      <div className="diet-option-block">
+        <span className="diet-field-label-text">horário usual</span>
+        <div className="choice-row">
+          {TRAINING_SCHEDULE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              className={`chip${profile.training_schedule === option.value ? ' chip--active' : ''}`}
+              onClick={() => setField('training_schedule', option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="diet-option-block">
+        <span className="diet-field-label-text">duração média</span>
+        <div className="choice-row">
+          {TRAINING_DURATION_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              className={`chip${profile.training_duration_min === option.value ? ' chip--active' : ''}`}
+              onClick={() => setField('training_duration_min', option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="diet-option-block">
+        <span className="diet-field-label-text">intensidade</span>
+        <div className="choice-row">
+          {TRAINING_INTENSITY_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              className={`chip${profile.training_intensity === option.value ? ' chip--active' : ''}`}
+              onClick={() => setField('training_intensity', option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        className={`diet-toggle-row${profile.fasted_training ? ' diet-toggle-row--active' : ''}`}
+        onClick={() => setField('fasted_training', !profile.fasted_training)}
+      >
+        <span>costuma treinar em jejum</span>
+        <strong>{profile.fasted_training ? 'sim' : 'não'}</strong>
+      </button>
     </div>
   );
 }
 
-// ─── subcomponentes ───────────────────────────────────────────────────────────
+function ExamUploadShortcut({ onOpenLabs }: { onOpenLabs: () => void }) {
+  return (
+    <div className="diet-exam-shortcut">
+      <span className="diet-field-label-text">exames recentes</span>
+      <p className="t-body-sm muted">Envie PDF ou foto no hub de saúde. A IA NUTRI usa o que estiver salvo lá, sem digitação manual.</p>
+      <button type="button" className="btn btn--secondary btn--sm" onClick={onOpenLabs}>
+        abrir exames
+      </button>
+    </div>
+  );
+}
 
-function MacroChip({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function NutritionTargetPreview({ targets }: { targets: NutritionTargets }) {
+  return (
+    <div className="diet-target-preview" data-testid="nutrition-target-preview">
+      <span className="eyebrow">estimativa inicial</span>
+      <div>
+        <strong>{targets.calories} kcal</strong>
+        <small>{targets.protein}g proteína · {targets.proteinPerKg}g/kg · {targets.label}</small>
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-seção: DietBox ────────────────────────────────────────────────────────
+
+function DietboxSection({ pdfDoc, pdfSignedUrl, uploading, onUpload, onRemove }: {
+  pdfDoc: DietDocumentRow | null;
+  pdfSignedUrl: string | null;
+  uploading: boolean;
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <section className="card stack" data-testid="dietbox-section">
+      <span className="eyebrow">dieta DietBox</span>
+
+      {!pdfDoc && (
+        <div className="diet-upload-area">
+          <p className="t-body-sm muted">Envie o PDF da sua dieta DietBox. Ele ficará visível aqui para consulta.</p>
+          <label className={`file-button${uploading ? ' file-button--loading' : ''}`}>
+            {uploading ? 'enviando...' : 'selecionar PDF'}
+            <input
+              type="file" accept="application/pdf,.pdf" disabled={uploading}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }}
+              data-testid="pdf-file-input"
+            />
+          </label>
+        </div>
+      )}
+
+      {pdfDoc && (
+        <div className="diet-pdf-card" data-testid="pdf-card">
+          <div className="diet-pdf-card__header">
+            <div>
+              <strong>{pdfDoc.file_name}</strong>
+              <small>enviado em {new Date(pdfDoc.uploaded_at).toLocaleDateString('pt-BR')}</small>
+            </div>
+            <div className="inline-actions">
+              <label className="file-button file-button--quiet">
+                substituir PDF
+                <input type="file" accept="application/pdf,.pdf"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) { onRemove(); onUpload(f); } }} />
+              </label>
+              <button className="btn btn--secondary btn--sm" onClick={onRemove}>remover</button>
+            </div>
+          </div>
+
+          {pdfSignedUrl && (
+            <div className="diet-pdf-viewer" data-testid="pdf-viewer">
+              <iframe
+                src={pdfSignedUrl}
+                title={pdfDoc.file_name}
+                className="diet-pdf-frame"
+              />
+            </div>
+          )}
+          {!pdfSignedUrl && (
+            <a className="diet-pdf-link" href="#" target="_blank" rel="noreferrer">
+              {pdfDoc.file_name}
+            </a>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Sub-seção: Dieta manual ───────────────────────────────────────────────────
+
+function ManualDietSection({
+  meals, foodsByMeal, addingMealName, editingFoodMealId,
+  foodDraft, searchQuery, searchResults, searching,
+  onAddingMealNameChange, onAddMeal, onRemoveMeal, onAddFoodToggle,
+  onFoodSearchChange, onSelectProduct, onFoodDraftChange, onAddFood, onRemoveFood,
+}: {
+  meals: DietMealRow[];
+  foodsByMeal: Record<string, DietFoodRow[]>;
+  addingMealName: string;
+  editingFoodMealId: string | null;
+  foodDraft: FoodDraft;
+  searchQuery: string;
+  searchResults: SearchProduct[];
+  searching: boolean;
+  onAddingMealNameChange: (v: string) => void;
+  onAddMeal: () => void;
+  onRemoveMeal: (id: string) => void;
+  onAddFoodToggle: (id: string) => void;
+  onFoodSearchChange: (q: string) => void;
+  onSelectProduct: (p: SearchProduct) => void;
+  onFoodDraftChange: (patch: Partial<FoodDraft>) => void;
+  onAddFood: (mealId: string) => void;
+  onRemoveFood: (mealId: string, foodId: string) => void;
+}) {
+  return (
+    <section className="stack" data-testid="manual-diet-section">
+      <div className="card stack">
+        <span className="eyebrow">refeições</span>
+        <div className="diet-meal-add-row">
+          <input
+            className="field"
+            placeholder="nome da refeição (ex: Café da manhã)"
+            value={addingMealName}
+            onChange={(e) => onAddingMealNameChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onAddMeal(); }}
+            data-testid="meal-name-input"
+          />
+          <button className="btn btn--primary btn--sm" onClick={onAddMeal}>+ refeição</button>
+        </div>
+
+        {meals.length === 0 && (
+          <p className="t-body-sm muted">Adicione refeições para montar sua dieta manual.</p>
+        )}
+
+        {meals.map((meal) => {
+          const mealFoods = foodsByMeal[meal.id] ?? [];
+          return (
+            <article key={meal.id} className="diet-meal-item" data-testid={`meal-${meal.id}`}>
+              <div className="diet-meal-item__header">
+                <div>
+                  <strong>{meal.name}</strong>
+                  {meal.meal_time && <small>{meal.meal_time}</small>}
+                </div>
+                <div className="diet-meal-item__totals" data-testid={`meal-totals-${meal.id}`}>
+                  <span>{meal.total_calories} kcal</span>
+                  <span>{meal.total_protein}g P</span>
+                  <span>{meal.total_carbs}g C</span>
+                  <span>{meal.total_fat}g G</span>
+                </div>
+                <div className="inline-actions">
+                  <button className="btn btn--secondary btn--sm" onClick={() => onAddFoodToggle(meal.id)}>
+                    {editingFoodMealId === meal.id ? 'cancelar' : '+ alimento'}
+                  </button>
+                  <CircleButton variant="close" ariaLabel="Remover refeição" onClick={() => onRemoveMeal(meal.id)} />
+                </div>
+              </div>
+
+              {editingFoodMealId === meal.id && (
+                <FoodForm
+                  mealId={meal.id}
+                  foodDraft={foodDraft}
+                  searchQuery={searchQuery}
+                  searchResults={searchResults}
+                  searching={searching}
+                  onSearchChange={onFoodSearchChange}
+                  onSelectProduct={onSelectProduct}
+                  onDraftChange={onFoodDraftChange}
+                  onAdd={() => onAddFood(meal.id)}
+                />
+              )}
+
+              {mealFoods.length > 0 && (
+                <div className="diet-food-list">
+                  {mealFoods.map((food) => (
+                    <div key={food.id} className="diet-food-row-item" data-testid={`food-${food.id}`}>
+                      <div className="diet-food-row-item__info">
+                        <span>{food.name}</span>
+                        <small>{food.quantity}{food.unit}</small>
+                      </div>
+                      <div className="diet-food-row-item__macros">
+                        <span>{food.calories} kcal</span>
+                        <span>{food.protein}g P</span>
+                        <span>{food.carbs}g C</span>
+                        <span>{food.fat}g G</span>
+                      </div>
+                      <CircleButton variant="close" ariaLabel="Remover alimento" onClick={() => onRemoveFood(meal.id, food.id)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ── Sub-formulário de alimento ────────────────────────────────────────────────
+
+function FoodForm({ mealId, foodDraft, searchQuery, searchResults, searching, onSearchChange, onSelectProduct, onDraftChange, onAdd }: {
+  mealId: string;
+  foodDraft: FoodDraft;
+  searchQuery: string;
+  searchResults: SearchProduct[];
+  searching: boolean;
+  onSearchChange: (q: string) => void;
+  onSelectProduct: (p: SearchProduct) => void;
+  onDraftChange: (patch: Partial<FoodDraft>) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="diet-food-form stack" data-testid={`food-form-${mealId}`}>
+      <div className="diet-search-wrap">
+        <input
+          className="field"
+          placeholder="buscar alimento (ex: ovo, frango, banana...)"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          autoComplete="off"
+        />
+        {searching && <span className="diet-search-loading">buscando...</span>}
+        {searchResults.length > 0 && (
+          <ul className="diet-search-results">
+            {searchResults.map((p) => (
+              <li key={p.id}>
+                <button className="diet-search-item" onClick={() => onSelectProduct(p)}>
+                  <span className="diet-search-item__name">{p.title}</span>
+                  {p.brand && <span className="diet-search-item__brand">{p.brand}</span>}
+                  <span className="diet-search-item__kcal">{Math.round(p.kcal_per_100g * p.serving_g / 100)} kcal / {p.serving_g}g</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="diet-food-row">
+        <label className="diet-field-label">
+          <span>quantidade</span>
+          <input className="field" type="number" min={1}
+            value={foodDraft.quantity} onChange={(e) => onDraftChange({ quantity: Number(e.target.value) || 0 })} />
+        </label>
+        <label className="diet-field-label">
+          <span>unidade</span>
+          <select className="field" value={foodDraft.unit} onChange={(e) => onDraftChange({ unit: e.target.value })}>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="unidade">unidade</option>
+            <option value="colher">colher</option>
+            <option value="xícara">xícara</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="diet-macros-row">
+        <label className="diet-field-label">
+          <span>kcal</span>
+          <input className="field" type="number" min={0}
+            value={foodDraft.calories} onChange={(e) => onDraftChange({ calories: Number(e.target.value) || 0 })} />
+        </label>
+        <label className="diet-field-label">
+          <span>prot (g)</span>
+          <input className="field" type="number" min={0} step={0.1}
+            value={foodDraft.protein} onChange={(e) => onDraftChange({ protein: Number(e.target.value) || 0 })} />
+        </label>
+        <label className="diet-field-label">
+          <span>carbo (g)</span>
+          <input className="field" type="number" min={0} step={0.1}
+            value={foodDraft.carbs} onChange={(e) => onDraftChange({ carbs: Number(e.target.value) || 0 })} />
+        </label>
+        <label className="diet-field-label">
+          <span>gord (g)</span>
+          <input className="field" type="number" min={0} step={0.1}
+            value={foodDraft.fat} onChange={(e) => onDraftChange({ fat: Number(e.target.value) || 0 })} />
+        </label>
+      </div>
+
+      <button className="btn btn--primary" onClick={onAdd}>adicionar ao plano</button>
+    </div>
+  );
+}
+
+// ── Sub-seção: Água ───────────────────────────────────────────────────────────
+
+function WaterSection({ consumedMl, targetMl, onAdd, onTargetChange }: {
+  consumedMl: number;
+  targetMl: number;
+  onAdd: (ml: number) => void;
+  onTargetChange: (ml: number) => void;
+}) {
+  const pct = waterProgressPct(consumedMl, targetMl);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState(String(Math.round(targetMl / 1000 * 10) / 10));
+
+  return (
+    <section className="card stack" style={{ '--dim': 'var(--diet)' } as CSSProperties} data-testid="water-section">
+      <div className="row-between">
+        <span className="eyebrow">água</span>
+        <button className="btn btn--secondary btn--sm" onClick={() => setEditingTarget((v) => !v)}>
+          {editingTarget ? 'fechar' : 'meta'}
+        </button>
+      </div>
+
+      <div className="diet-water-display">
+        <span className="t-display-md">{(consumedMl / 1000).toFixed(1).replace('.', ',')}L</span>
+        <span className="t-body-sm muted">de {(targetMl / 1000).toFixed(1).replace('.', ',')}L · {pct}%</span>
+      </div>
+
+      <div className="diet-water-bar diet-water-bar--lg">
+        <div className="diet-water-bar__fill" style={{ width: `${pct}%` }} />
+      </div>
+
+      {editingTarget && (
+        <div className="diet-water-target-row">
+          <label className="diet-field-label">
+            <span>meta diária (L)</span>
+            <input className="field" type="number" min={0.5} max={8} step={0.1}
+              value={targetInput} onChange={(e) => setTargetInput(e.target.value)} />
+          </label>
+          <button className="btn btn--primary btn--sm" onClick={() => {
+            const ml = Math.round(Number(targetInput) * 1000);
+            if (ml >= 500 && ml <= 8000) { onTargetChange(ml); setEditingTarget(false); }
+          }}>salvar meta</button>
+        </div>
+      )}
+
+      <div className="water-grid">
+        {[250, 300, 500].map((ml) => (
+          <button key={ml} className="btn btn--sm btn--light" onClick={() => onAdd(ml)}>
+            +{ml}ml
+          </button>
+        ))}
+        <button className="btn btn--sm btn--outline-light" onClick={() => onAdd(-250)}>-250ml</button>
+      </div>
+    </section>
+  );
+}
+
+// ── Componentes auxiliares ────────────────────────────────────────────────────
+
+function MacroChip({ label, value, highlight, sub }: { label: string; value: string; highlight?: boolean; sub?: string }) {
   return (
     <div className={`diet-macro-chip${highlight ? ' diet-macro-chip--highlight' : ''}`}>
       <span className="diet-macro-chip__value">{value}</span>
       <span className="diet-macro-chip__label">{label}</span>
+      {sub && <span className="diet-macro-chip__sub">{sub}</span>}
     </div>
   );
 }
 
-function NutriTextarea({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function NutriTextarea({ label, value, onChange, placeholder }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string;
+}) {
   return (
     <label className="diet-nutri-field">
       <span>{label}</span>
@@ -944,17 +1298,5 @@ function NutriTextarea({ label, value, onChange, placeholder }: { label: string;
   );
 }
 
-function AiAdditionRow({ addition, onDismiss }: { addition: DietAiAddition; onDismiss: (id: string) => void }) {
-  return (
-    <article className="diet-ai-item">
-      <span className="diet-ai-item__mark">IA</span>
-      <span>
-        <strong>{addition.title}</strong>
-        {(addition.note || addition.rationale) && <small>{addition.note || addition.rationale}</small>}
-      </span>
-      <div>
-        <CircleButton variant="close" ariaLabel="Dispensar sugestão" onClick={() => void onDismiss(addition.id)} />
-      </div>
-    </article>
-  );
-}
+// Compatibilidade: tipos usados em outros módulos
+export type { MealType };
